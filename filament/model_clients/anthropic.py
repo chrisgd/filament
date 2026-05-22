@@ -37,6 +37,9 @@ class AnthropicClient:
             "cache_control": {"type": "ephemeral"},
             "messages": _to_wire_messages(messages),
         }
+        system = _system_prompt(messages)
+        if system:
+            body["system"] = system
         if tools:
             body["tools"] = [_to_wire_tool(t) for t in tools]
         reply = httpx.post(
@@ -53,16 +56,31 @@ class AnthropicClient:
         return _from_wire_response(reply.json())
 
 
+def _system_prompt(messages: list[Message]) -> str:
+    """Join system-role messages for the Messages-API top-level `system` param.
+
+    The Messages API has no `system` role inside `messages`; system
+    instructions go in a dedicated top-level field. Lifting them here is
+    exactly the wire-format difference this client exists to absorb.
+    """
+    parts = [m.content for m in messages if m.role == "system" and m.content]
+    return "\n\n".join(parts)
+
+
 def _to_wire_messages(messages: list[Message]) -> list[dict[str, object]]:
     """Translate internal Messages into Anthropic Messages-API messages.
 
-    Tool results are user-role messages carrying `tool_result` blocks;
-    consecutive tool results are coalesced into one user message, as the API
-    expects results for one assistant turn grouped together.
+    System messages are excluded — they are lifted into the top-level `system`
+    request parameter by `_system_prompt`. Tool results are user-role messages
+    carrying `tool_result` blocks; consecutive tool results are coalesced into
+    one user message, as the API expects results for one assistant turn
+    grouped together.
     """
     wire: list[dict[str, object]] = []
     pending_results: list[dict[str, object]] | None = None
     for message in messages:
+        if message.role == "system":
+            continue
         if message.role == "tool":
             block: dict[str, object] = {
                 "type": "tool_result",

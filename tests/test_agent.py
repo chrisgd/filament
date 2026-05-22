@@ -51,6 +51,17 @@ def test_returns_final_text_without_tool_calls(tmp_path) -> None:
     assert len(client.calls) == 1
 
 
+def test_loop_emits_system_message_before_task(tmp_path) -> None:
+    client = FakeClient([Response(final_text="done")])
+    with Session(tmp_path / "s.jsonl") as session:
+        run_agent("the task", client, Registry(), session, "fake")
+    first_call = client.calls[0]
+    assert first_call[0].role == "system"
+    assert first_call[0].content
+    assert first_call[1].role == "user"
+    assert first_call[1].content == "Task: the task"
+
+
 def test_dispatches_tool_call_then_returns_final(tmp_path) -> None:
     client = FakeClient(
         [

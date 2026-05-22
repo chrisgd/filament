@@ -46,7 +46,13 @@ class RosieClient:
 
 
 def _to_wire_message(message: Message) -> dict[str, object]:
-    """Translate an internal Message into an OpenAI chat message."""
+    """Translate an internal Message into an OpenAI chat message.
+
+    System messages need no special handling: the OpenAI chat format carries
+    system instructions as a `system`-role entry in the `messages` array, so a
+    `role="system"` message passes through the generic path unchanged. (The
+    Anthropic client must instead lift them to a top-level `system` param.)
+    """
     if message.role == "tool":
         return {
             "role": "tool",

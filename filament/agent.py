@@ -36,7 +36,8 @@ def run_agent(
     it. Returns the model's final text response.
     """
     messages: list[Message] = [
-        Message(role="user", content=f"{SYSTEM_PROMPT}\n\nTask: {task}")
+        Message(role="system", content=SYSTEM_PROMPT),
+        Message(role="user", content=f"Task: {task}"),
     ]
     tools = registry.schemas()
 
