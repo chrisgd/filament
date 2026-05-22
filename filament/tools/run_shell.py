@@ -22,7 +22,9 @@ def _run_shell(arguments: dict[str, object]) -> str:
             timeout=_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired:
-        return f"command timed out after {_TIMEOUT_SECONDS}s: {command}"
+        raise TimeoutError(
+            f"command timed out after {_TIMEOUT_SECONDS}s: {command}"
+        ) from None
     return (
         f"exit code: {completed.returncode}\n"
         f"--- stdout ---\n{completed.stdout}\n"

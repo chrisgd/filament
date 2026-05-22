@@ -116,3 +116,12 @@ def test_run_shell_stdout_without_trailing_newline() -> None:
     registry = build_registry()
     result = registry.invoke("run_shell", {"command": "printf nonewline"})
     assert "nonewline\n--- stderr ---" in result
+
+
+def test_run_shell_timeout_raises(monkeypatch) -> None:
+    from filament.tools import run_shell as run_shell_module
+
+    monkeypatch.setattr(run_shell_module, "_TIMEOUT_SECONDS", 1)
+    registry = build_registry()
+    with pytest.raises(TimeoutError, match="timed out"):
+        registry.invoke("run_shell", {"command": "sleep 5"})
