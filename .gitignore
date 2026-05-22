@@ -221,3 +221,10 @@ workshop/
 
 # Filament session transcripts (run artifacts)
 filament-sessions/
+
+# Claude Code local config — keep shared agent definitions, ignore the rest
+.claude/*
+!.claude/agents/
+
+# macOS
+.DS_Store
