@@ -1,2 +1,45 @@
-# filament
-Coding agent for Rosie
+# Filament
+
+A minimal agent harness for the Diercks School of Advanced Computing. A Python
+CLI that runs a read/decide/act/observe loop against either Rosie (an
+open-weights model served by vLLM with an OpenAI-compatible API) or the
+Anthropic Messages API.
+
+## Installation
+To install and run this, do the following:
+```
+git clone <repo>
+cd filament
+pip install -e .            # to use it
+pip install -e ".[dev]"     # to develop / run tests
+```
+
+## Usage
+Filament has two modes, one that runs against Anthropic, one that runs against Rosie.
+
+To run against Anthropic (the default backend):
+```
+FILAMENT_ANTHROPIC_API_KEY=sk-ant-... \
+filament "read the README and tell me what this project does"
+```
+
+To run against Rosie, the following environment variables must be defined:
+```
+FILAMENT_ROSIE_ENDPOINT=http://localhost:8000/v1 \
+FILAMENT_ROSIE_MODEL=some-open-model \
+filament --backend rosie "read the README and tell me what this project does"
+```
+
+Session transcripts are written to `./filament-sessions/{timestamp}.jsonl`.
+
+## Tests
+
+```
+pytest                 # offline tests
+pytest -m integration  # contract tests that hit a real backend
+```
+
+## Further reading
+
+See [`CLAUDE.md`](CLAUDE.md) for architecture, design principles, and the
+procedures for adding tools and backends.
