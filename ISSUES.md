@@ -80,7 +80,7 @@ loop changes are needed.
 
 ## Issue 3 — System prompt is embedded in a user message instead of a system role
 
-**Status:** Open
+**Status:** Done (commit bc3f255)
 **Severity:** Design weakness (medium)
 **Location:** `filament/agent.py:38-40`
 
