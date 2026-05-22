@@ -14,9 +14,9 @@ from filament.tools.base import Registry
 # --- Registry --------------------------------------------------------------
 
 
-def test_registry_schemas_lists_registered_tools() -> None:
+def test_registry_tools_lists_registered_tools() -> None:
     registry = build_registry()
-    names = {tool.name for tool in registry.schemas()}
+    names = {tool.name for tool in registry.tools()}
     assert names == {"read_file", "write_file", "run_shell"}
 
 

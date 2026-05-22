@@ -39,7 +39,7 @@ def run_agent(
         Message(role="system", content=SYSTEM_PROMPT),
         Message(role="user", content=f"Task: {task}"),
     ]
-    tools = registry.schemas()
+    tools = registry.tools()
 
     for _ in range(MAX_ITERATIONS):
         session.log_model_call(backend, messages)
