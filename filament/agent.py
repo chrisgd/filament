@@ -14,10 +14,9 @@ from .tools.base import Registry
 from .types import Message
 
 SYSTEM_PROMPT = (
-    "You are Filament, a small autonomous agent. You accomplish the user's "
-    "task by calling the provided tools. Inspect the situation with tools "
-    "before acting, take one step at a time, and when the task is complete "
-    "respond with a plain-text answer and no further tool calls."
+    "Use the provided tools to accomplish the user's task. "
+    "Read state before changing it. "
+    "When the task is complete, respond with a plain-text answer and stop calling tools."
 )
 
 # Alternative, more robust system prompt, kept as an instructional example.
