@@ -106,6 +106,7 @@ filament/
     ├── write_file.py
     └── run_shell.py
 tests/
+├── test_cli.py
 ├── test_tools.py
 ├── test_agent.py
 ├── test_model_clients.py           # Integration tests, marked @pytest.mark.integration
@@ -116,6 +117,7 @@ tests/
 
 - **Type hints throughout.** The model clients, internal types, and registry interfaces should pass `mypy --strict`. The rest of the codebase can be looser but should still be typed where it helps clarity.
 - **Tests run on every commit.** `pytest` from the project root. Integration tests that hit a real backend are marked `@pytest.mark.integration` and excluded by default; run them explicitly with `pytest -m integration`.
+- **New code lands with tests.** Any new module or user-facing behavior ships with offline tests in `tests/`, not just tools and backends. If a change has no test, that's a blocker, not a follow-up.
 - **Commits are small.** A new tool is one commit. A refactor is its own commit. No mixed changes.
 - **Never push directly to `main`.** `main` is protected. Do all work on a feature branch and open a pull request; `main` only advances through merged PRs.
 - **The README stays minimal.** Installation, one usage example per backend, link to this file. No tutorial content; faculty workshop materials live elsewhere.
