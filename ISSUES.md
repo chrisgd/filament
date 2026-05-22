@@ -272,6 +272,120 @@ Either drop the clause, or attribute the default correctly, e.g.
 
 ---
 
+## Issue 9 — `main()` reports only configuration errors; runtime failures escape as a traceback
+
+**Status:** Open — filed 2026-05-22
+**Severity:** Bug (medium)
+**Location:** `filament/cli.py:39-58`
+
+### Problem
+`main()` catches `ValueError` from `build_client` and prints a clean
+`configuration error: ...` line (`cli.py:42-44`). But the `run_agent` call at
+`cli.py:54` is wrapped only in `try/finally` — there is no `except`. Any failure
+raised inside the agent loop escapes `main()` as an unhandled traceback:
+
+- `httpx` transport errors — connection refused, DNS failure, read timeout
+- `reply.raise_for_status()` on a 401/429/500 (`anthropic.py:55`, `rosie.py:44`)
+- the 120s request timeout (`_TIMEOUT_SECONDS = 120.0`) — before it fires, the
+  CLI sits completely silent, then throws
+
+The result is an inconsistent failure surface: a missing API key produces a
+tidy one-liner, but a backend that is down, rate-limiting, or slow produces
+either a two-minute silent hang or a raw Python traceback. For teaching
+infrastructure that is meant to be legible, neither is acceptable. Note also
+that all error output goes to stderr — only a successful `print(result)` writes
+to stdout — so any invocation that captures only stdout makes every failure
+mode look identical and silent.
+
+### Fix
+Wrap the `run_agent` call so runtime failures are reported as a clean
+`error: ...` line on stderr and `main()` returns a nonzero exit code. Catch
+`httpx.HTTPError` explicitly (it covers both transport and status errors); decide
+whether to also broadly catch other exceptions or let genuinely unexpected ones
+surface. Keep the existing `ValueError` config-error handling and keep
+`session.close()` in the `finally`. Do **not** add error handling inside the
+loop — `agent._dispatch` already turns *tool* failures into text; this issue is
+about failures of the model call and transport, which belong to the CLI.
+
+### Acceptance criteria
+- A backend or transport failure produces a one-line `error: ...` message and a
+  nonzero exit code, not a traceback.
+- The session transcript is still closed on the failure path.
+- Covered by an offline test (see Issue 10).
+
+---
+
+## Issue 10 — The CLI layer has no test coverage
+
+**Status:** Open — filed 2026-05-22
+**Severity:** Test gap (medium)
+**Location:** `tests/` (no `test_cli.py`); `filament/cli.py`
+
+### Problem
+Every module has a matching test file except `cli.py`: `tests/` contains
+`test_agent.py`, `test_tools.py`, `test_session.py`, and `test_model_clients.py`,
+but no `test_cli.py`. `main()`, argument parsing, runtime assembly, and the
+error-printing branches are never exercised. `test_agent.py` calls `run_agent`
+directly with fake clients (`test_agent.py:13,47`), bypassing the entire CLI
+layer. As a result no test asserts behavior for missing arguments, an invalid
+`--backend`, a missing API key, or a backend failure — which is why Issue 9 went
+unnoticed.
+
+### Fix
+Add `tests/test_cli.py`. `main()` already takes an explicit `argv` argument
+(`cli.py:20`) specifically so it can be driven from a test — use it. Cover at
+minimum:
+
+- No arguments: argparse raises `SystemExit(2)` (assert with `pytest.raises`).
+- Configuration error: a missing API key yields exit code 2 and a message on
+  stderr.
+- Happy path: with a stubbed/fake client and registry, `main()` returns 0 and
+  prints the agent result to stdout.
+- `--backend` overrides `config.backend`.
+
+Stub `build_client` / `run_agent` or inject fakes — tests must not hit a real
+backend (CLAUDE.md: tests run offline). Nothing here is an integration test.
+
+### Acceptance criteria
+- `tests/test_cli.py` exists and drives `main()` via its `argv` parameter.
+- Missing-args, config-error, and happy paths are all asserted (exit codes and
+  output streams).
+- Tests run offline under the default `pytest` run.
+
+---
+
+## Issue 11 — `filament` with no arguments prints a bare argparse error instead of help
+
+**Status:** Open — filed 2026-05-22
+**Severity:** UX (low)
+**Location:** `filament/cli.py:20-32`
+
+### Problem
+Running `filament` with no arguments prints argparse's two-line usage error to
+stderr and exits 2:
+
+```
+usage: filament [-h] [--backend {rosie,anthropic}] task
+filament: error: the following arguments are required: task
+```
+
+For a one-shot teaching CLI, a new user's first instinct is often to run the
+bare command to see what it does; a terse "argument required" error on stderr is
+a thin first impression, and easy to miss entirely if stderr is not visible.
+Many CLIs print full help in this case. This is minor and partly a matter of
+taste — flagging it for an explicit decision, not mandating a change.
+
+### Fix (optional — decide before implementing)
+If `argv` is empty, print `parser.format_help()` to stdout and exit. Keep the
+argparse error for the case where some arguments are given but `task` is
+missing. Do not over-engineer this.
+
+### Acceptance criteria
+- A decision is recorded: either implement no-args-prints-help, or move this
+  entry to "Resolved / Not an issue" with a one-line rationale.
+
+---
+
 ## Resolved / Not an issue
 
 ### Explanatory comments in `cli.py` `main()` — INTENTIONAL, no action
