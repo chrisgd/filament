@@ -16,8 +16,9 @@ from .model_clients import build_client
 from .session import new_session
 from .tools import build_registry
 
-
+# main entry point for filament agent
 def main(argv: list[str] | None = None) -> int:
+    # this just outputs help info if you run it with --help or -h
     parser = argparse.ArgumentParser(
         prog="filament",
         description="Run a task through the Filament agent loop.",
@@ -26,29 +27,37 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--backend",
         choices=["rosie", "anthropic"],
-        help="override the FILAMENT_BACKEND setting for this run",
+        help="override the FILAMENT_BACKEND setting for this run (which defaults to anthropic)",
     )
     args = parser.parse_args(argv)
 
+    # loads up the configuration
     config = load_config()
     if args.backend is not None:
         config.backend = args.backend
 
     try:
+        # create the client
         client = build_client(config)
     except ValueError as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2
 
+    # then build the registry
     registry = build_registry()
+    # now create the new session
     session = new_session()
     try:
+        # the loop is basically executed through run_agent, 
+        # which takes the client, registry, and session as arguments
+        # and returns the final result when done
         result = run_agent(
             args.task, client, registry, session, config.backend
         )
     finally:
         session.close()
 
+    # print out the result and the session ID so we can look it up
     print(result)
     print(f"\n[transcript: {session.path}]", file=sys.stderr)
     return 0

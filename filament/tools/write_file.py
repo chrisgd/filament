@@ -6,7 +6,11 @@ import os
 
 from .base import Tool
 
-
+# write a file with the given content, but note that this
+# could potentially write to any path the agent has access to, 
+# so for example, your entire home directory. Should be limited
+# to specific directories it can act in and not allowed to 
+# arbitrarily write elsewhere in the system for safety.
 def _write_file(arguments: dict[str, object]) -> str:
     path = arguments["path"]
     content = arguments["content"]

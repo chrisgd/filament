@@ -245,7 +245,7 @@ which reads as a criticism — with a line stating the block's purpose, e.g.
 
 ## Issue 8 — `--backend` help text claims a default the flag does not have
 
-**Status:** Open
+**Status:** Done
 **Severity:** Doc/UX (low)
 **Location:** `filament/cli.py:30`
 

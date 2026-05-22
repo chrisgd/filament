@@ -8,7 +8,11 @@ from .base import Tool
 
 _TIMEOUT_SECONDS = 30
 
-
+# obviously dangerous because you could arbitrarily
+# execute any code on the machine running the agent,
+# but useful for a starting point. Instead you'd want
+# to build more specific tools that only allow certain
+# safe or protected operations.
 def _run_shell(arguments: dict[str, object]) -> str:
     command = arguments["command"]
     if not isinstance(command, str):
