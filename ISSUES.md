@@ -164,7 +164,7 @@ makes the failure observable in the transcript. Coordinate with Issue 6 (the
 
 ## Issue 5 — `Registry.schemas()` is misnamed
 
-**Status:** Open
+**Status:** Done (commit 3d874c9)
 **Severity:** Naming (low)
 **Location:** `filament/tools/base.py:40-42`, callers in `filament/agent.py:41`
 
