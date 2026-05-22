@@ -208,7 +208,78 @@ Issue 4 first, then write `__post_init__` to match the final agreed semantics.
 
 ---
 
+## Issue 7 — Commented-out alternative system prompt breaks if uncommented
+
+**Status:** Done
+**Severity:** Bug (low) — latent
+**Location:** `filament/agent.py:22-32`
+
+### Problem
+The commented-out alternative `SYSTEM_PROMPT` is intentional instructional
+content: it shows readers a more robust prompt than the active one. That is
+fine and should stay. But as written, if a reader uncomments it, adjacent
+string literals concatenate with no separating space:
+
+- `"...the provided tools."` + `"Read before you write:..."` → `"...tools.Read before..."`
+- `"...making changes."` + `"Stay within the scope..."` → `"...changes.Stay within..."`
+- `"...retry the same call."` + `"You are done..."` → `"...call.You are done..."`
+
+The active `SYSTEM_PROMPT` above gets this right (trailing space on each
+continued line); the commented block does not.
+
+### Fix
+Add a trailing space to the end of each line in the commented block that is
+followed by another literal, matching the active prompt's style. Leave the
+wording of the prompt otherwise unchanged. Also replace the current
+`# Longer system prompt, but less clear to someone reading the code` line —
+which reads as a criticism — with a line stating the block's purpose, e.g.
+`# Alternative, more robust system prompt, kept as an instructional example.`
+
+### Acceptance criteria
+- Uncommenting the block yields a prompt with correct word spacing throughout.
+- A comment above the block explains it is an instructional example of a more
+  robust prompt.
+- The wording of the prompt text itself is unchanged.
+
+---
+
+## Issue 8 — `--backend` help text claims a default the flag does not have
+
+**Status:** Open
+**Severity:** Doc/UX (low)
+**Location:** `filament/cli.py:30`
+
+### Problem
+The `--help` text for `--backend` says "defaults to anthropic":
+
+```python
+help="override the FILAMENT_BACKEND setting for this run, defaults to anthropic",
+```
+
+The `--backend` argument has no argparse default — it is `None` unless passed,
+and only overrides `config.backend` when set (`cli.py:36-37`). The "anthropic"
+default actually lives in `config.py` / `FILAMENT_BACKEND`. As worded, the help
+implies the flag itself defaults to anthropic, which is misleading.
+
+### Fix
+Either drop the clause, or attribute the default correctly, e.g.
+`"override the FILAMENT_BACKEND setting for this run (which defaults to anthropic)"`.
+
+### Acceptance criteria
+- Help text does not imply the `--backend` flag has an argparse default.
+- If the default is mentioned, it is attributed to the `FILAMENT_BACKEND`
+  setting, not the flag.
+
+---
+
 ## Resolved / Not an issue
+
+### Explanatory comments in `cli.py` `main()` — INTENTIONAL, no action
+The step-by-step comments added in `cli.py` `main()` (`# loads up the
+configuration`, `# create the client`, etc.) were flagged in review as
+low-value narration. They are intentional: they exist for human readers
+skimming the code, who benefit from signposting more than an AI reader would.
+This is teaching infrastructure — keep them. Do not re-flag in future reviews.
 
 ### cache_control at the Anthropic request top level — CORRECT, no action
 `filament/model_clients/anthropic.py:38` sets `"cache_control": {"type":
