@@ -13,7 +13,7 @@ to every fix below.
 
 ## Issue 1 — `run_shell` mangles output when stdout has no trailing newline
 
-**Status:** Open
+**Status:** Done (commit 95c2744)
 **Severity:** Bug (low)
 **Location:** `filament/tools/run_shell.py:26-30`
 
@@ -48,7 +48,7 @@ stdout/stderr end in newlines.
 
 ## Issue 2 — `run_shell` uses a different error convention than the other tools
 
-**Status:** Open
+**Status:** Done (commit ca4b17d)
 **Severity:** Design inconsistency (low)
 **Location:** `filament/tools/run_shell.py:24-25`
 
