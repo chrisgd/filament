@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+workshop/
+
+# Filament session transcripts (run artifacts)
+filament-sessions/

@@ -1,0 +1,36 @@
+"""Environment-based settings.
+
+Every setting has a default here and is overridable via an environment
+variable. The CLI may override `backend` via a flag; nothing else is
+configurable on the command line in v1.
+"""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+
+DEFAULT_BACKEND = "anthropic"
+DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6"
+
+
+@dataclass
+class Config:
+    backend: str
+    rosie_endpoint: str
+    rosie_model: str
+    anthropic_api_key: str
+    anthropic_model: str
+
+
+def load_config() -> Config:
+    """Read settings from the environment, applying defaults."""
+    return Config(
+        backend=os.environ.get("FILAMENT_BACKEND", DEFAULT_BACKEND),
+        rosie_endpoint=os.environ.get("FILAMENT_ROSIE_ENDPOINT", ""),
+        rosie_model=os.environ.get("FILAMENT_ROSIE_MODEL", ""),
+        anthropic_api_key=os.environ.get("FILAMENT_ANTHROPIC_API_KEY", ""),
+        anthropic_model=os.environ.get(
+            "FILAMENT_ANTHROPIC_MODEL", DEFAULT_ANTHROPIC_MODEL
+        ),
+    )

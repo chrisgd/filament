@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "filament"
+version = "0.1.0"
+description = "A minimal agentic coding harness for the Diercks School of Advanced Computing"
+requires-python = ">=3.11"
+dependencies = ["httpx"]
+
+[project.optional-dependencies]
+dev = ["pytest", "mypy"]
+
+[project.scripts]
+filament = "filament.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["filament*"]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: tests that hit a real backend; excluded from the default run",
+]
+addopts = "-m 'not integration'"
+
+[tool.mypy]
+strict = true
+files = ["filament"]
