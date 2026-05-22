@@ -210,7 +210,7 @@ Issue 4 first, then write `__post_init__` to match the final agreed semantics.
 
 ## Issue 7 — Commented-out alternative system prompt breaks if uncommented
 
-**Status:** Done
+**Status:** Done (commit 6b536a7)
 **Severity:** Bug (low) — latent
 **Location:** `filament/agent.py:22-32`
 
@@ -245,7 +245,7 @@ which reads as a criticism — with a line stating the block's purpose, e.g.
 
 ## Issue 8 — `--backend` help text claims a default the flag does not have
 
-**Status:** Done
+**Status:** Done (commit 05f1caf)
 **Severity:** Doc/UX (low)
 **Location:** `filament/cli.py:30`
 
