@@ -49,3 +49,10 @@ class Response:
 
     final_text: str | None = None
     tool_calls: list[ToolCall] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if self.final_text is not None and self.tool_calls:
+            raise ValueError(
+                "Response carries both final_text and tool_calls; a response "
+                "is final text or tool calls, never both."
+            )

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from filament.agent import MAX_ITERATIONS, run_agent
 from filament.session import Session
 from filament.tools.base import Registry, Tool
@@ -114,6 +116,14 @@ def test_empty_model_output_stops_with_explicit_message(tmp_path) -> None:
         result = run_agent("do nothing", client, Registry(), session, "fake")
     assert result == "Stopped: model returned empty output."
     assert len(client.calls) == 1
+
+
+def test_response_rejects_both_fields() -> None:
+    with pytest.raises(ValueError):
+        Response(
+            final_text="done",
+            tool_calls=[ToolCall(id="c1", name="ping", arguments={})],
+        )
 
 
 def test_iteration_cap_stops_the_loop(tmp_path) -> None:
