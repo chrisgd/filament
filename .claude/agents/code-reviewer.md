@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Reviews recent code changes for problems that would matter at merge time. Use proactively after writing or modifying code, or when explicitly asked to review a diff, file, or directory. Returns a prioritized list of issues with concrete fixes.
+description: Reviews recent code changes for problems that would cause bugs, incidents, or maintenance pain — not stylistic preferences. Use proactively after writing or modifying code,or when explicitly asked to review a diff, file, or directory.
 tools: Read, Grep, Glob, Bash
 model: inherit
 memory: project
