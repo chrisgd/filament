@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import sys
 
+import httpx
+
 from .agent import run_agent
 from .config import load_config
 from .model_clients import build_client
@@ -54,6 +56,11 @@ def main(argv: list[str] | None = None) -> int:
         result = run_agent(
             args.task, client, registry, session, config.backend
         )
+    except httpx.HTTPError as exc:
+        # a backend or transport failure is reported as a clean line,
+        # not surfaced to the user as an unhandled traceback
+        print(f"error: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 1
     finally:
         session.close()
 
