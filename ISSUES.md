@@ -356,7 +356,8 @@ backend (CLAUDE.md: tests run offline). Nothing here is an integration test.
 
 ## Issue 11 — `filament` with no arguments prints a bare argparse error instead of help
 
-**Status:** Open — filed 2026-05-22
+**Status:** Done (commit 13e85fb)
+**Resolution:** A third option beyond the two in the original issue — no-args launches interactive mode. See @specs/SPEC-interactive.md.
 **Severity:** UX (low)
 **Location:** `filament/cli.py:20-32`
 
