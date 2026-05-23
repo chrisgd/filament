@@ -114,7 +114,8 @@ tests/
 ├── test_model_clients.py           # Integration tests, marked @pytest.mark.integration
 └── test_session.py
 specs/
-└── SPEC-interactive.md             # Interactive mode design spec
+├── SPEC-interactive.md             # Interactive mode design spec
+└── SPEC-ask-user-tool.md           # `ask_user` elicitation tool design spec
 ```
 
 ## Development Conventions
@@ -149,4 +150,5 @@ The CLI accepts `--backend rosie|anthropic` as an override. Faculty running Fila
 
 - `SPEC.md` — Original build spec (kept for reference; this CLAUDE.md is now the authority)
 - @specs/SPEC-interactive.md — Interactive mode design spec; read this before touching interactive-mode code
+- @specs/SPEC-ask-user-tool.md — `ask_user` elicitation-tool design spec; read this before implementing the agent-driven Q&A pattern
 - `tests/` — The behavioral contract; if in doubt, read the tests
