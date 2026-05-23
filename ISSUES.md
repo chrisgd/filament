@@ -389,7 +389,7 @@ missing. Do not over-engineer this.
 
 ## Issue 12 — `Conversation.send()` leaves messages malformed on empty-output and iteration-cap exits
 
-**Status:** Open — filed 2026-05-22
+**Status:** Done (commit eabdb0d)
 **Severity:** Bug (medium)
 **Location:** `filament/agent.py:96-97, 119-122`
 
@@ -432,7 +432,7 @@ sentinel string that is returned. Two lines per path. No other changes.
 
 ## Issue 13 — Interactive read-loop fails to strip `\r`, breaking CRLF slash commands
 
-**Status:** Open — filed 2026-05-22
+**Status:** Done (commit 5da7c1e)
 **Severity:** Bug (low)
 **Location:** `filament/interactive.py:68`
 
