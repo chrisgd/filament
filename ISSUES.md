@@ -387,6 +387,85 @@ missing. Do not over-engineer this.
 
 ---
 
+## Issue 12 — `Conversation.send()` leaves messages malformed on empty-output and iteration-cap exits
+
+**Status:** Open — filed 2026-05-22
+**Severity:** Bug (medium)
+**Location:** `filament/agent.py:96-97, 119-122`
+
+### Problem
+`Conversation.send()` has three exit paths. The `final_text` path correctly
+appends an assistant message to `self.messages` before returning
+(`agent.py:87-94`), so the next `.send()` sees a coherent history. The other
+two paths do not:
+
+- **Empty-output** (`agent.py:96-97`): returns the `"Stopped: model returned
+  empty output."` sentinel without appending anything. `self.messages` ends
+  with the user message and no assistant reply.
+- **`MAX_ITERATIONS` cap** (`agent.py:119-122`): returns the
+  `"Stopped: reached the 25-iteration limit..."` sentinel without appending
+  anything. `self.messages` ends with the most recent tool_result.
+
+For one-shot use (`run_agent`) this is invisible — `messages` is discarded on
+return. But interactive mode persists the `Conversation` across turns. After
+either exit, a follow-up `.send("next task")` produces a history like
+`[system, user, user]` (empty-output case) or `[..., tool, user]`
+(cap case). Some backends reject those shapes outright; others happily reply
+to a malformed conversation, masking the bug.
+
+This is the same bug-class that was caught and fixed in PR #6 for the
+`final_text` path. The fix should have been generalized; it wasn't.
+
+### Fix
+Append a synthetic `Message(role="assistant", content=<sentinel>)` immediately
+before returning on each of the two remaining exit paths, using the same
+sentinel string that is returned. Two lines per path. No other changes.
+
+### Acceptance criteria
+- After a `.send()` that returns the empty-output sentinel, the next
+  `.send("anything")` sees a `[system, user, assistant, user]` history.
+- Same for the iteration-cap sentinel.
+- Multi-turn test in `tests/test_agent.py` covers both paths.
+- Existing single-turn tests of `run_agent` continue to pass untouched.
+
+---
+
+## Issue 13 — Interactive read-loop fails to strip `\r`, breaking CRLF slash commands
+
+**Status:** Open — filed 2026-05-22
+**Severity:** Bug (low)
+**Location:** `filament/interactive.py:68`
+
+### Problem
+The read-loop strips only `\n` from each line:
+
+```python
+line = line.rstrip("\n")
+```
+
+If input arrives with CRLF line endings (e.g. `printf "/exit\r\n" | filament`,
+or input piped from a file edited on Windows or by a tool that writes CRLF),
+`/exit` becomes `/exit\r`, fails the exact-match check against `_COMMANDS`,
+and is treated as a task — sent to the model. Same for `/reset`, `/messages`,
+`/help`. The user sees the agent attempt to "do" their command instead of
+exiting/resetting.
+
+This was considered during PR #6 implementation and dismissed as
+"Mac/Linux infra only." That dismissal was wrong — the piped-input case is
+real on Unix too, and the fix is a single character.
+
+### Fix
+Change `line.rstrip("\n")` to `line.rstrip("\r\n")`. Both characters are
+trimmed; LF-only input is unaffected.
+
+### Acceptance criteria
+- An interactive session driven with `\r\n`-terminated input exits cleanly
+  on `/exit\r\n` and resets cleanly on `/reset\r\n`.
+- Test in `tests/test_interactive.py` exercises CRLF input.
+- LF-only behavior is unchanged.
+
+---
+
 ## Resolved / Not an issue
 
 ### Explanatory comments in `cli.py` `main()` — INTENTIONAL, no action
