@@ -65,7 +65,7 @@ def run_interactive(
             print("", file=stdout)
             return 0
 
-        line = line.rstrip("\n")
+        line = line.rstrip("\r\n")
         if not line.strip():
             # Empty line — re-prompt, no model call.
             continue

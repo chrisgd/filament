@@ -241,6 +241,44 @@ def test_conversation_reset_logs_event_to_transcript(tmp_path) -> None:
     assert any(e["event"] == "conversation_reset" for e in events)
 
 
+def test_conversation_appends_assistant_on_empty_output(tmp_path) -> None:
+    # Issue 12: an empty-output turn must still record an assistant message,
+    # otherwise the next .send() produces [system, user, user] — malformed.
+    client = FakeClient([Response(), Response(final_text="recovered")])
+    with Session(tmp_path / "s.jsonl") as session:
+        conversation = Conversation(client, Registry(), session, "fake")
+        first = conversation.send("ask one")
+        assert first == "Stopped: model returned empty output."
+        assert conversation.messages[-1].role == "assistant"
+        assert conversation.messages[-1].content == first
+        conversation.send("ask two")
+    second_call = client.calls[1]
+    roles = [m.role for m in second_call]
+    assert roles == ["system", "user", "assistant", "user"]
+
+
+def test_conversation_appends_assistant_on_iteration_cap(tmp_path) -> None:
+    # Issue 12: a turn that hits MAX_ITERATIONS must still record an
+    # assistant message before the next .send() appends a user message.
+    looping = [
+        Response(tool_calls=[ToolCall(id=f"c{i}", name="ping", arguments={})])
+        for i in range(MAX_ITERATIONS)
+    ]
+    client = FakeClient(looping + [Response(final_text="finally")])
+    registry = _registry_with("ping", lambda args: "pong")
+    with Session(tmp_path / "s.jsonl") as session:
+        conversation = Conversation(client, registry, session, "fake")
+        first = conversation.send("loop forever")
+        assert "limit" in first
+        assert conversation.messages[-1].role == "assistant"
+        assert conversation.messages[-1].content == first
+        conversation.send("after cap")
+    # The call after the cap-out must see a coherent end-of-history.
+    follow_up_call = client.calls[MAX_ITERATIONS]
+    assert follow_up_call[-1].role == "user"
+    assert follow_up_call[-2].role == "assistant"
+
+
 def test_conversation_messages_grow_across_turns(tmp_path) -> None:
     client = FakeClient(
         [Response(final_text="a"), Response(final_text="b")]

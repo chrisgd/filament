@@ -94,7 +94,14 @@ class Conversation:
                 return response.final_text
 
             if not response.tool_calls:
-                return "Stopped: model returned empty output."
+                # Empty output: record the sentinel as the assistant turn so
+                # the conversation history stays coherent for a follow-up
+                # .send(). Symmetric with the final_text path above.
+                stopped = "Stopped: model returned empty output."
+                self.messages.append(
+                    Message(role="assistant", content=stopped)
+                )
+                return stopped
 
             self.messages.append(
                 Message(
@@ -116,10 +123,14 @@ class Conversation:
                     )
                 )
 
-        return (
+        # Iteration cap reached: record the sentinel as the assistant turn so
+        # the conversation history stays coherent for a follow-up .send().
+        stopped = (
             f"Stopped: reached the {MAX_ITERATIONS}-iteration limit without a "
             "final answer."
         )
+        self.messages.append(Message(role="assistant", content=stopped))
+        return stopped
 
 
 def run_agent(
