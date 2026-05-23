@@ -111,6 +111,8 @@ tests/
 ├── test_agent.py
 ├── test_model_clients.py           # Integration tests, marked @pytest.mark.integration
 └── test_session.py
+specs/
+└── SPEC-interactive.md             # Interactive mode design spec
 ```
 
 ## Development Conventions
@@ -144,4 +146,5 @@ The CLI accepts `--backend rosie|anthropic` as an override. Faculty running Fila
 ## Key References
 
 - `SPEC.md` — Original build spec (kept for reference; this CLAUDE.md is now the authority)
+- @specs/SPEC-interactive.md — Interactive mode design spec; read this before touching interactive-mode code
 - `tests/` — The behavioral contract; if in doubt, read the tests
