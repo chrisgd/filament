@@ -49,6 +49,18 @@ def test_tool_call_and_result_events(tmp_path) -> None:
     assert events[1]["result"] == "file contents"
 
 
+def test_log_reset_writes_conversation_reset_event(tmp_path) -> None:
+    path = tmp_path / "s.jsonl"
+    with Session(path) as session:
+        session.log_model_call("fake", [Message(role="user", content="hi")])
+        session.log_reset()
+        session.log_model_call("fake", [Message(role="user", content="hi")])
+    events = _read_events(path)
+    kinds = [e["event"] for e in events]
+    assert kinds == ["model_call", "conversation_reset", "model_call"]
+    assert "timestamp" in events[1]
+
+
 def test_new_session_creates_timestamped_file(tmp_path) -> None:
     session = new_session(tmp_path)
     session.close()

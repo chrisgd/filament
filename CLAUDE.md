@@ -90,7 +90,8 @@ No async in this version. No external services beyond the configured backend.
 ```
 filament/
 ├── cli.py                          # Argument parsing, runtime assembly
-├── agent.py                        # The read/decide/act/observe loop
+├── agent.py                        # The read/decide/act/observe loop + Conversation
+├── interactive.py                  # Interactive-mode read-loop (see @specs/SPEC-interactive.md)
 ├── types.py                        # Message, ToolCall, Response dataclasses
 ├── config.py                       # Environment-based settings
 ├── session.py                      # Transcript logging
@@ -109,8 +110,11 @@ tests/
 ├── test_cli.py
 ├── test_tools.py
 ├── test_agent.py
+├── test_interactive.py
 ├── test_model_clients.py           # Integration tests, marked @pytest.mark.integration
 └── test_session.py
+specs/
+└── SPEC-interactive.md             # Interactive mode design spec
 ```
 
 ## Development Conventions
@@ -144,4 +148,5 @@ The CLI accepts `--backend rosie|anthropic` as an override. Faculty running Fila
 ## Key References
 
 - `SPEC.md` — Original build spec (kept for reference; this CLAUDE.md is now the authority)
+- @specs/SPEC-interactive.md — Interactive mode design spec; read this before touching interactive-mode code
 - `tests/` — The behavioral contract; if in doubt, read the tests

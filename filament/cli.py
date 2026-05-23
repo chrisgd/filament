@@ -14,6 +14,7 @@ import httpx
 
 from .agent import run_agent
 from .config import load_config
+from .interactive import run_interactive
 from .model_clients import build_client
 from .session import new_session
 from .tools import build_registry
@@ -25,7 +26,11 @@ def main(argv: list[str] | None = None) -> int:
         prog="filament",
         description="Run a task through the Filament agent loop.",
     )
-    parser.add_argument("task", help="natural-language task description")
+    parser.add_argument(
+        "task",
+        nargs="?",
+        help="natural-language task description; omit to start interactive mode",
+    )
     parser.add_argument(
         "--backend",
         choices=["rosie", "anthropic"],
@@ -49,8 +54,20 @@ def main(argv: list[str] | None = None) -> int:
     registry = build_registry()
     # now create the new session
     session = new_session()
+
+    # no task on the command line -> interactive mode (see @specs/SPEC-interactive.md)
+    if args.task is None:
+        try:
+            exit_code = run_interactive(
+                client, registry, session, config.backend
+            )
+        finally:
+            session.close()
+        print(f"\n[transcript: {session.path}]", file=sys.stderr)
+        return exit_code
+
     try:
-        # the loop is basically executed through run_agent, 
+        # the loop is basically executed through run_agent,
         # which takes the client, registry, and session as arguments
         # and returns the final result when done
         result = run_agent(

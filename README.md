@@ -30,6 +30,14 @@ FILAMENT_ROSIE_MODEL=some-open-model \
 filament --backend rosie "read the README and tell me what this project does"
 ```
 
+Omit the task argument to start interactive mode — a multi-turn conversation
+in which the agent remembers prior turns. Type `/help` at the prompt for the
+list of slash commands.
+```
+FILAMENT_ANTHROPIC_API_KEY=sk-ant-... \
+filament
+```
+
 Session transcripts are written to `./filament-sessions/{timestamp}.jsonl`.
 
 ## Tests
