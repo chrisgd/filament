@@ -17,24 +17,23 @@ pip install -e ".[dev]"     # to develop / run tests
 ## Usage
 Filament has two modes, one that runs against Anthropic, one that runs against Rosie.
 
-To run against Anthropic (the default backend):
-```
-FILAMENT_ANTHROPIC_API_KEY=sk-ant-... \
-filament "read the README and tell me what this project does"
-```
-
-To run against Rosie, the following environment variables must be defined:
+To run against Rosie (the default backend), set the endpoint and model:
 ```
 FILAMENT_ROSIE_ENDPOINT=http://localhost:8000/v1 \
 FILAMENT_ROSIE_MODEL=some-open-model \
-filament --backend rosie "read the README and tell me what this project does"
+filament "read the README and tell me what this project does"
+```
+
+To run against Anthropic:
+```
+FILAMENT_ANTHROPIC_API_KEY=sk-ant-... \
+filament --backend anthropic "read the README and tell me what this project does"
 ```
 
 Omit the task argument to start interactive mode — a multi-turn conversation
 in which the agent remembers prior turns. Type `/help` at the prompt for the
 list of slash commands.
 ```
-FILAMENT_ANTHROPIC_API_KEY=sk-ant-... \
 filament
 ```
 

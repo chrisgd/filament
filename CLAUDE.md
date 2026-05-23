@@ -138,7 +138,7 @@ specs/
 
 Settings load from environment variables with defaults defined in `filament/config.py`:
 
-- `FILAMENT_BACKEND` — `anthropic` (default) or `rosie`
+- `FILAMENT_BACKEND` — `rosie` (default) or `anthropic`
 - `FILAMENT_ROSIE_ENDPOINT` — base URL for Rosie's OpenAI-compatible API
 - `FILAMENT_ROSIE_MODEL` — model name to request from Rosie
 - `FILAMENT_ANTHROPIC_API_KEY` — Anthropic API key
