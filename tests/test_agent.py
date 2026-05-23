@@ -10,7 +10,7 @@ import json
 
 import pytest
 
-from filament.agent import MAX_ITERATIONS, run_agent
+from filament.agent import MAX_ITERATIONS, Conversation, run_agent
 from filament.session import Session
 from filament.tools.base import Registry, Tool
 from filament.types import Message, Response, ToolCall
@@ -178,3 +178,39 @@ def test_transcript_records_every_event(tmp_path) -> None:
         "model_response",
     ]
     assert events[0]["backend"] == "rosie"
+
+
+def test_conversation_accumulates_history_across_turns(tmp_path) -> None:
+    client = FakeClient(
+        [
+            Response(final_text="answer one"),
+            Response(final_text="answer two"),
+        ]
+    )
+    with Session(tmp_path / "s.jsonl") as session:
+        conversation = Conversation(client, Registry(), session, "fake")
+        first = conversation.send("first task")
+        second = conversation.send("second task")
+    assert first == "answer one"
+    assert second == "answer two"
+    # The second model_call must see the first turn's user + assistant
+    # messages, so follow-ups can reference earlier turns.
+    second_call = client.calls[1]
+    roles = [m.role for m in second_call]
+    assert roles == ["system", "user", "assistant", "user"]
+    assert second_call[1].content == "Task: first task"
+    assert second_call[2].content == "answer one"
+    assert second_call[3].content == "Task: second task"
+
+
+def test_conversation_messages_grow_across_turns(tmp_path) -> None:
+    client = FakeClient(
+        [Response(final_text="a"), Response(final_text="b")]
+    )
+    with Session(tmp_path / "s.jsonl") as session:
+        conversation = Conversation(client, Registry(), session, "fake")
+        assert len(conversation.messages) == 1  # just the system message
+        conversation.send("one")
+        assert len(conversation.messages) == 3  # +user, +assistant
+        conversation.send("two")
+        assert len(conversation.messages) == 5  # +user, +assistant
