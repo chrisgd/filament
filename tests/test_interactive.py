@@ -10,10 +10,10 @@ import io
 
 import httpx
 
-from filament.interactive import run_interactive
+from filament.interactive import ConsoleReporter, run_interactive
 from filament.session import Session
 from filament.tools.base import Registry, Tool
-from filament.types import Message, Response
+from filament.types import Message, Response, ToolCall
 
 
 class FakeClient:
@@ -168,3 +168,127 @@ def test_httpx_error_inside_a_turn_does_not_kill_the_loop(tmp_path) -> None:
     assert "ConnectError" in err
     assert "recovered" in out
     assert client.call_count == 2
+
+
+def _registry_with(name: str, handler) -> Registry:
+    registry = Registry()
+    registry.register(
+        Tool(
+            name=name,
+            description="test tool",
+            parameters={"type": "object", "properties": {}},
+            handler=handler,
+        )
+    )
+    return registry
+
+
+def _run_with_registry(
+    tmp_path, client, registry: Registry, script: str
+) -> tuple[int, str, str]:
+    """Like `_run` but with a caller-supplied registry, for tool-path tests."""
+    stdin = io.StringIO(script)
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with Session(tmp_path / "s.jsonl") as session:
+        code = run_interactive(
+            client,
+            registry,
+            session,
+            "fake",
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+        )
+    return code, stdout.getvalue(), stderr.getvalue()
+
+
+def test_interactive_emits_activity_signals_around_turn(tmp_path) -> None:
+    # A turn that dispatches one tool then finishes should produce:
+    # [thinking...], [tool] read_file path="README.md", [tool ok] ..., final.
+    client = FakeClient(
+        [
+            Response(
+                tool_calls=[
+                    ToolCall(
+                        id="c1",
+                        name="read_file",
+                        arguments={"path": "README.md"},
+                    )
+                ]
+            ),
+            Response(final_text="summary text"),
+        ]
+    )
+    registry = _registry_with("read_file", lambda args: "FILE CONTENT")
+    _, out, _ = _run_with_registry(
+        tmp_path, client, registry, "read README\n/exit\n"
+    )
+    # Two model calls → two [thinking...] lines.
+    assert out.count("[thinking...]") == 2
+    assert '[tool] read_file path="README.md"' in out
+    # len("FILE CONTENT") == 12
+    assert "[tool ok] read_file (12 bytes)" in out
+    # The model's final text still prints below the activity signals.
+    assert "summary text" in out
+    # Ordering: [tool] line appears before [tool ok], both before final text.
+    tool_idx = out.index("[tool] read_file")
+    ok_idx = out.index("[tool ok] read_file")
+    final_idx = out.index("summary text")
+    assert tool_idx < ok_idx < final_idx
+
+
+def test_interactive_renders_tool_error_with_error_type(tmp_path) -> None:
+    def boom(args: dict) -> str:
+        raise FileNotFoundError("nope.txt")
+
+    client = FakeClient(
+        [
+            Response(
+                tool_calls=[
+                    ToolCall(id="c1", name="bad", arguments={})
+                ]
+            ),
+            Response(final_text="recovered"),
+        ]
+    )
+    registry = _registry_with("bad", boom)
+    _, out, _ = _run_with_registry(
+        tmp_path, client, registry, "try it\n/exit\n"
+    )
+    assert "[tool err] bad: FileNotFoundError" in out
+    # Compact: the full error message stays in the transcript and the next
+    # model context but is not echoed verbatim on the activity line.
+    assert "nope.txt" not in out
+
+
+def test_console_reporter_truncates_long_argument_values() -> None:
+    # Argument values longer than ~60 chars get a "..." trailer in the echoed
+    # line. The full value reaches the transcript and the model unchanged.
+    out = io.StringIO()
+    reporter = ConsoleReporter(out)
+    long_value = "x" * 200
+    reporter.tool_call("run_shell", {"cmd": long_value})
+    line = out.getvalue()
+    assert "run_shell" in line
+    assert "..." in line
+    # The full 200-x value must not appear verbatim.
+    assert long_value not in line
+
+
+def test_console_reporter_handles_empty_tool_result() -> None:
+    # Empty tool output is a real, common result (e.g. write_file). The
+    # reporter renders it as `(0 bytes)` rather than skipping the line.
+    out = io.StringIO()
+    reporter = ConsoleReporter(out)
+    reporter.tool_result("write_file", "")
+    assert "[tool ok] write_file (0 bytes)" in out.getvalue()
+
+
+def test_console_reporter_handles_tool_call_with_no_arguments() -> None:
+    # No-argument tool calls should not leave a trailing space on the line.
+    out = io.StringIO()
+    reporter = ConsoleReporter(out)
+    reporter.tool_call("ping", {})
+    line = out.getvalue()
+    assert line == "[tool] ping\n"

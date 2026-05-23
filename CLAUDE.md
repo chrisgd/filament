@@ -151,4 +151,5 @@ The CLI accepts `--backend rosie|anthropic` as an override. Faculty running Fila
 - `SPEC.md` — Original build spec (kept for reference; this CLAUDE.md is now the authority)
 - @specs/SPEC-interactive.md — Interactive mode design spec; read this before touching interactive-mode code
 - @specs/SPEC-ask-user-tool.md — `ask_user` elicitation-tool design spec; read this before implementing the agent-driven Q&A pattern
+- @specs/SPEC-activity-signals.md — Activity-signal design spec; read this before adding progress output to interactive mode
 - `tests/` — The behavioral contract; if in doubt, read the tests

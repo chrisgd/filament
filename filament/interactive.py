@@ -18,6 +18,71 @@ from .session import Session
 from .tools.base import Registry
 from .types import Message
 
+_ARG_VALUE_MAX = 60
+_ARG_TRUNCATION_SUFFIX = "..."
+
+
+class ConsoleReporter:
+    """A `TurnReporter` that mirrors loop transitions to a text stream.
+
+    One ASCII line per event, no in-place updates, no color. The point is
+    to make the loop visible to a student watching the terminal — see
+    @specs/SPEC-activity-signals.md. The structured transcript (JSONL) is
+    the canonical record; this is the human-skimmable counterpart.
+    """
+
+    def __init__(self, stream: TextIO) -> None:
+        self._stream = stream
+
+    def model_call_start(self, iteration: int) -> None:
+        # The line stays put — the next event (a [tool] line or the model's
+        # final text) is itself the signal that the call returned.
+        print("[thinking...]", file=self._stream, flush=True)
+
+    def model_call_end(self) -> None:
+        # No-op: the following [tool] line or the final text already shows
+        # that the call returned. The hook exists so the Protocol is honored.
+        pass
+
+    def tool_call(self, name: str, arguments: dict[str, object]) -> None:
+        rendered = _format_args(arguments)
+        line = f"[tool] {name} {rendered}".rstrip()
+        print(line, file=self._stream, flush=True)
+
+    def tool_result(self, name: str, result: str) -> None:
+        if result.startswith("error: "):
+            # `_dispatch` formats failures as "error: <ErrorType>: <msg>".
+            # The reporter surfaces only the type to keep the line compact;
+            # the full message is in the transcript and the next model
+            # message context. A tool that *returns* a string starting with
+            # "error: " would be mis-rendered as a failure — that convention
+            # is owned by `_dispatch`, so tool authors shouldn't compose
+            # their own "error: " prefix into a success result.
+            err_type = result.split(":", 2)[1].strip()
+            print(f"[tool err] {name}: {err_type}", file=self._stream, flush=True)
+        else:
+            print(
+                f"[tool ok] {name} ({len(result)} bytes)",
+                file=self._stream,
+                flush=True,
+            )
+
+
+def _format_args(arguments: dict[str, object]) -> str:
+    """Render tool arguments as space-separated key="value" pairs.
+
+    Values are stringified and truncated past ~60 characters so a long
+    file body or shell command doesn't blow up the terminal line. The full
+    argument value remains in the transcript.
+    """
+    parts: list[str] = []
+    for key, value in arguments.items():
+        text = str(value)
+        if len(text) > _ARG_VALUE_MAX:
+            text = text[: _ARG_VALUE_MAX - len(_ARG_TRUNCATION_SUFFIX)] + _ARG_TRUNCATION_SUFFIX
+        parts.append(f'{key}="{text}"')
+    return " ".join(parts)
+
 _BANNER = "filament interactive mode. /help for commands, /exit to quit."
 _PROMPT = "> "
 _HELP_TEXT = (
@@ -49,7 +114,10 @@ def run_interactive(
     continues; mid-turn Ctrl-C escapes (the model call is a blocking
     `httpx.post` — documented limitation, see @specs/SPEC-interactive.md).
     """
-    conversation = Conversation(client, registry, session, backend)
+    reporter = ConsoleReporter(stdout)
+    conversation = Conversation(
+        client, registry, session, backend, reporter=reporter
+    )
     print(_BANNER, file=stdout)
 
     while True:
