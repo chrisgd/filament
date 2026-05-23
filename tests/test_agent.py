@@ -279,6 +279,110 @@ def test_conversation_appends_assistant_on_iteration_cap(tmp_path) -> None:
     assert follow_up_call[-2].role == "assistant"
 
 
+class RecordingReporter:
+    """A TurnReporter test double: appends each call to a list of tuples."""
+
+    def __init__(self) -> None:
+        self.events: list[tuple] = []
+
+    def model_call_start(self, iteration: int) -> None:
+        self.events.append(("model_call_start", iteration))
+
+    def model_call_end(self) -> None:
+        self.events.append(("model_call_end",))
+
+    def tool_call(self, name: str, arguments: dict) -> None:
+        self.events.append(("tool_call", name, dict(arguments)))
+
+    def tool_result(self, name: str, result: str) -> None:
+        self.events.append(("tool_result", name, result))
+
+
+def test_reporter_fires_at_each_loop_transition(tmp_path) -> None:
+    # One tool call then a final text — exercises all four hooks across two
+    # iterations: start/end around the first model call, tool_call/tool_result
+    # around the dispatch, then start/end around the second model call.
+    client = FakeClient(
+        [
+            Response(
+                tool_calls=[
+                    ToolCall(id="c1", name="ping", arguments={"x": 1})
+                ]
+            ),
+            Response(final_text="done"),
+        ]
+    )
+    registry = _registry_with("ping", lambda args: "pong")
+    reporter = RecordingReporter()
+    with Session(tmp_path / "s.jsonl") as session:
+        Conversation(
+            client, registry, session, "fake", reporter=reporter
+        ).send("ping it")
+    assert reporter.events == [
+        ("model_call_start", 1),
+        ("model_call_end",),
+        ("tool_call", "ping", {"x": 1}),
+        ("tool_result", "ping", "pong"),
+        ("model_call_start", 2),
+        ("model_call_end",),
+    ]
+
+
+def test_reporter_receives_error_string_for_failed_tools(tmp_path) -> None:
+    # The reporter should see the same "error: <Type>: <msg>" string that
+    # `_dispatch` returns to the model — formatting is the reporter's job.
+    def boom(args: dict) -> str:
+        raise FileNotFoundError("missing.txt")
+
+    client = FakeClient(
+        [
+            Response(tool_calls=[ToolCall(id="c1", name="bad", arguments={})]),
+            Response(final_text="ok"),
+        ]
+    )
+    registry = _registry_with("bad", boom)
+    reporter = RecordingReporter()
+    with Session(tmp_path / "s.jsonl") as session:
+        Conversation(
+            client, registry, session, "fake", reporter=reporter
+        ).send("try it")
+    tool_results = [e for e in reporter.events if e[0] == "tool_result"]
+    assert len(tool_results) == 1
+    assert tool_results[0][1] == "bad"
+    assert tool_results[0][2].startswith("error: FileNotFoundError")
+
+
+def test_omitting_reporter_keeps_loop_silent(tmp_path) -> None:
+    # The default behavior (no reporter) must be byte-identical to today —
+    # nothing constructs a reporter, nothing fires. This is the regression
+    # guard for one-shot mode silence.
+    client = FakeClient([Response(final_text="done")])
+    with Session(tmp_path / "s.jsonl") as session:
+        # No reporter kwarg passed; .send completes without exceptions.
+        Conversation(client, Registry(), session, "fake").send("task")
+
+
+def test_run_agent_oneshot_emits_no_activity_signals(tmp_path, capsys) -> None:
+    # The one-shot wrapper must stay silent: no [thinking...] or [tool] lines
+    # leak to stdout/stderr. Activity signals are interactive-only.
+    client = FakeClient(
+        [
+            Response(
+                tool_calls=[ToolCall(id="c1", name="ping", arguments={})]
+            ),
+            Response(final_text="finished"),
+        ]
+    )
+    registry = _registry_with("ping", lambda args: "pong")
+    with Session(tmp_path / "s.jsonl") as session:
+        run_agent("ping", client, registry, session, "fake")
+    captured = capsys.readouterr()
+    assert "[thinking" not in captured.out
+    assert "[tool" not in captured.out
+    assert "[thinking" not in captured.err
+    assert "[tool" not in captured.err
+
+
 def test_conversation_messages_grow_across_turns(tmp_path) -> None:
     client = FakeClient(
         [Response(final_text="a"), Response(final_text="b")]

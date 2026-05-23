@@ -8,10 +8,33 @@ appears here, something has gone wrong (see CLAUDE.md).
 
 from __future__ import annotations
 
+from typing import Protocol
+
 from .model_clients.base import ModelClient
 from .session import Session
 from .tools.base import Registry
 from .types import Message
+
+
+class TurnReporter(Protocol):
+    """Hook surface for surfacing loop transitions to a human-readable sink.
+
+    A `TurnReporter` is a small contract the agent loop calls at the same
+    four control-flow points where `Session.log_*` already fires. Reporters
+    own *presentation* (e.g. printing `[thinking...]` to a terminal); the
+    structured JSONL transcript remains the canonical record. See
+    @specs/SPEC-activity-signals.md.
+
+    Reporters sit inside the loop's trust boundary — exceptions raised here
+    propagate out of `Conversation.send()`; there's no error-recovery
+    contract as there is for tools.
+    """
+
+    def model_call_start(self, iteration: int) -> None: ...
+    def model_call_end(self) -> None: ...
+    def tool_call(self, name: str, arguments: dict[str, object]) -> None: ...
+    def tool_result(self, name: str, result: str) -> None: ...
+
 
 SYSTEM_PROMPT = (
     "Use the provided tools to accomplish the user's task. "
@@ -56,11 +79,13 @@ class Conversation:
         registry: Registry,
         session: Session,
         backend: str,
+        reporter: TurnReporter | None = None,
     ) -> None:
         self._client = client
         self._registry = registry
         self._session = session
         self._backend = backend
+        self._reporter = reporter
         self.messages: list[Message] = [
             Message(role="system", content=SYSTEM_PROMPT),
         ]
@@ -79,9 +104,15 @@ class Conversation:
         self.messages.append(Message(role="user", content=f"Task: {task}"))
         tools = self._registry.tools()
 
-        for _ in range(MAX_ITERATIONS):
+        for iteration in range(MAX_ITERATIONS):
             self._session.log_model_call(self._backend, self.messages)
+            if self._reporter is not None:
+                # 1-based iteration is friendlier to humans skimming the log;
+                # the loop variable itself remains 0-based.
+                self._reporter.model_call_start(iteration + 1)
             response = self._client.complete(self.messages, tools)
+            if self._reporter is not None:
+                self._reporter.model_call_end()
             self._session.log_model_response(response)
 
             if response.final_text is not None:
@@ -112,8 +143,12 @@ class Conversation:
             )
             for call in response.tool_calls:
                 self._session.log_tool_call(call)
+                if self._reporter is not None:
+                    self._reporter.tool_call(call.name, call.arguments)
                 result = _dispatch(self._registry, call.name, call.arguments)
                 self._session.log_tool_result(call.id, call.name, result)
+                if self._reporter is not None:
+                    self._reporter.tool_result(call.name, result)
                 self.messages.append(
                     Message(
                         role="tool",
