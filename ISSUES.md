@@ -274,7 +274,7 @@ Either drop the clause, or attribute the default correctly, e.g.
 
 ## Issue 9 — `main()` reports only configuration errors; runtime failures escape as a traceback
 
-**Status:** Open — filed 2026-05-22
+**Status:** Done (commit ad80ef7)
 **Severity:** Bug (medium)
 **Location:** `filament/cli.py:39-58`
 
@@ -317,7 +317,7 @@ about failures of the model call and transport, which belong to the CLI.
 
 ## Issue 10 — The CLI layer has no test coverage
 
-**Status:** Open — filed 2026-05-22
+**Status:** Done (commit ad80ef7)
 **Severity:** Test gap (medium)
 **Location:** `tests/` (no `test_cli.py`); `filament/cli.py`
 
