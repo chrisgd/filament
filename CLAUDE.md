@@ -2,7 +2,7 @@
 
 A minimal agent harness for the Diercks School of Advanced Computing. Python CLI that runs a read/decide/act/observe loop against either Rosie (open-weights model via vLLM, OpenAI-compatible API) or the Anthropic API, dispatching tool calls through a registry.
 
-This is teaching infrastructure. It is intentionally small, intentionally conventional, and intentionally extensible. Faculty and summer grant participants will read and modify this code; clarity matters more than cleverness.
+This is teaching infrastructure. It is intentionally small, intentionally conventional, and intentionally extensible. Clarity matters more than cleverness.
 
 ## Architecture Overview
 
