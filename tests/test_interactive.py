@@ -131,6 +131,21 @@ def test_unknown_slash_command_is_treated_as_task(tmp_path) -> None:
     assert "/etc/hosts" in (user_message.content or "")
 
 
+def test_crlf_slash_commands_are_recognized(tmp_path) -> None:
+    # Issue 13: piped input with CRLF line endings (e.g. from a Windows-edited
+    # file or `printf "/exit\r\n"`) must still match the exact-command set.
+    # Without the \r strip, /exit becomes /exit\r and is sent to the model.
+    client = FakeClient([Response(final_text="ok")])
+    code, out, _ = _run(
+        tmp_path, client, "first task\r\n/exit\r\n"
+    )
+    assert code == 0
+    # The task ran (one model call), and /exit was honored — no second call.
+    assert len(client.calls) == 1
+    user_message = client.calls[0][1]
+    assert user_message.content == "Task: first task"
+
+
 def test_httpx_error_inside_a_turn_does_not_kill_the_loop(tmp_path) -> None:
     class FailThenSucceed:
         def __init__(self) -> None:
