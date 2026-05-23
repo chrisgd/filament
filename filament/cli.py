@@ -34,7 +34,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--backend",
         choices=["rosie", "anthropic"],
-        help="override the FILAMENT_BACKEND setting for this run (which defaults to anthropic)",
+        help="override the FILAMENT_BACKEND setting for this run (which defaults to rosie)",
     )
     args = parser.parse_args(argv)
 

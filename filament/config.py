@@ -10,8 +10,9 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-DEFAULT_BACKEND = "anthropic"
+DEFAULT_BACKEND = "rosie"
 DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6"
+DEFAULT_ROSIE_MODEL = "Qwen3-Coder-30B-A3B-Instruct"
 
 
 @dataclass
@@ -28,7 +29,7 @@ def load_config() -> Config:
     return Config(
         backend=os.environ.get("FILAMENT_BACKEND", DEFAULT_BACKEND),
         rosie_endpoint=os.environ.get("FILAMENT_ROSIE_ENDPOINT", ""),
-        rosie_model=os.environ.get("FILAMENT_ROSIE_MODEL", ""),
+        rosie_model=os.environ.get("FILAMENT_ROSIE_MODEL", DEFAULT_ROSIE_MODEL),
         anthropic_api_key=os.environ.get("FILAMENT_ANTHROPIC_API_KEY", ""),
         anthropic_model=os.environ.get(
             "FILAMENT_ANTHROPIC_MODEL", DEFAULT_ANTHROPIC_MODEL
