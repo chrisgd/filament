@@ -90,7 +90,8 @@ No async in this version. No external services beyond the configured backend.
 ```
 filament/
 ├── cli.py                          # Argument parsing, runtime assembly
-├── agent.py                        # The read/decide/act/observe loop
+├── agent.py                        # The read/decide/act/observe loop + Conversation
+├── interactive.py                  # Interactive-mode read-loop (see @specs/SPEC-interactive.md)
 ├── types.py                        # Message, ToolCall, Response dataclasses
 ├── config.py                       # Environment-based settings
 ├── session.py                      # Transcript logging
@@ -109,6 +110,7 @@ tests/
 ├── test_cli.py
 ├── test_tools.py
 ├── test_agent.py
+├── test_interactive.py
 ├── test_model_clients.py           # Integration tests, marked @pytest.mark.integration
 └── test_session.py
 specs/

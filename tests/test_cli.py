@@ -8,7 +8,6 @@ live LLM and no transcript files written to disk.
 from __future__ import annotations
 
 import httpx
-import pytest
 
 from filament import cli
 from filament.config import Config
@@ -39,11 +38,29 @@ def _stub_runtime(monkeypatch, *, run_agent) -> FakeSession:
     return session
 
 
-def test_no_arguments_exits_with_usage_error(capsys) -> None:
-    with pytest.raises(SystemExit) as exc:
-        cli.main([])
-    assert exc.value.code == 2
-    assert "required" in capsys.readouterr().err
+def test_no_arguments_starts_interactive_mode(monkeypatch) -> None:
+    called: dict[str, object] = {}
+
+    def fake_run_interactive(client, registry, session, backend) -> int:
+        called["backend"] = backend
+        return 0
+
+    session = FakeSession()
+    monkeypatch.setattr(cli, "build_client", lambda config: object())
+    monkeypatch.setattr(cli, "new_session", lambda: session)
+    monkeypatch.setattr(cli, "run_interactive", fake_run_interactive)
+
+    code = cli.main([])
+    assert code == 0
+    assert "backend" in called  # interactive was actually dispatched to
+    assert session.closed
+
+
+def test_interactive_exit_code_propagates(monkeypatch) -> None:
+    monkeypatch.setattr(cli, "build_client", lambda config: object())
+    monkeypatch.setattr(cli, "new_session", lambda: FakeSession())
+    monkeypatch.setattr(cli, "run_interactive", lambda *args: 7)
+    assert cli.main([]) == 7
 
 
 def test_missing_configuration_is_reported_cleanly(monkeypatch, capsys) -> None:
