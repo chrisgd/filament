@@ -65,6 +65,15 @@ class Conversation:
             Message(role="system", content=SYSTEM_PROMPT),
         ]
 
+    def reset(self) -> None:
+        """Drop accumulated turns; keep only the system message.
+
+        Records a `conversation_reset` event in the session so the transcript
+        is honest about the boundary between the old and new conversation.
+        """
+        self.messages = [Message(role="system", content=SYSTEM_PROMPT)]
+        self._session.log_reset()
+
     def send(self, task: str) -> str:
         """Append the user task, run the loop, return the final text."""
         self.messages.append(Message(role="user", content=f"Task: {task}"))

@@ -63,6 +63,15 @@ class Session:
             {"tool_call_id": tool_call_id, "name": name, "result": result},
         )
 
+    def log_reset(self) -> None:
+        """Record a /reset in an interactive conversation.
+
+        The transcript stays continuous across a reset; this event marks the
+        boundary so a later reader can tell that the next model_call's
+        message list was deliberately rewound rather than truncated by a bug.
+        """
+        self._write("conversation_reset", {})
+
     def close(self) -> None:
         """Close the underlying file handle."""
         self._handle.close()

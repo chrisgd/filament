@@ -203,6 +203,44 @@ def test_conversation_accumulates_history_across_turns(tmp_path) -> None:
     assert second_call[3].content == "Task: second task"
 
 
+def test_conversation_reset_drops_history_and_starts_fresh(tmp_path) -> None:
+    client = FakeClient(
+        [
+            Response(final_text="answer one"),
+            Response(final_text="answer two"),
+        ]
+    )
+    with Session(tmp_path / "s.jsonl") as session:
+        conversation = Conversation(client, Registry(), session, "fake")
+        conversation.send("first task")
+        assert len(conversation.messages) == 3
+        conversation.reset()
+        assert len(conversation.messages) == 1
+        assert conversation.messages[0].role == "system"
+        conversation.send("after reset")
+    # The second model_call (post-reset) must NOT see the first turn.
+    second_call = client.calls[1]
+    roles = [m.role for m in second_call]
+    assert roles == ["system", "user"]
+    assert second_call[1].content == "Task: after reset"
+
+
+def test_conversation_reset_logs_event_to_transcript(tmp_path) -> None:
+    import json as _json
+
+    path = tmp_path / "s.jsonl"
+    client = FakeClient([Response(final_text="ok")])
+    with Session(path) as session:
+        conversation = Conversation(client, Registry(), session, "fake")
+        conversation.send("task")
+        conversation.reset()
+    events = [
+        _json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert any(e["event"] == "conversation_reset" for e in events)
+
+
 def test_conversation_messages_grow_across_turns(tmp_path) -> None:
     client = FakeClient(
         [Response(final_text="a"), Response(final_text="b")]
