@@ -1,13 +1,17 @@
-"""Tests for the tool layer: the registry and the three initial tools.
+"""Tests for the tool layer: the registry and the registered tools.
 
 These tests run offline; none of them require an LLM.
 """
 
 from __future__ import annotations
 
+import io
+import sys
+
 import pytest
 
 from filament.tools import Tool, build_registry
+from filament.tools import ask_user as ask_user_module
 from filament.tools.base import Registry
 
 
@@ -17,7 +21,7 @@ from filament.tools.base import Registry
 def test_registry_tools_lists_registered_tools() -> None:
     registry = build_registry()
     names = {tool.name for tool in registry.tools()}
-    assert names == {"read_file", "write_file", "run_shell"}
+    assert names == {"read_file", "write_file", "run_shell", "ask_user"}
 
 
 def test_registry_invoke_dispatches_to_handler() -> None:
@@ -125,3 +129,108 @@ def test_run_shell_timeout_raises(monkeypatch) -> None:
     registry = build_registry()
     with pytest.raises(TimeoutError, match="timed out"):
         registry.invoke("run_shell", {"command": "sleep 5"})
+
+
+# --- ask_user --------------------------------------------------------------
+
+
+@pytest.fixture
+def ask_user_streams_reset():
+    """Restore ask_user's module-level streams after each test.
+
+    `configure_streams` mutates globals, so tests that don't restore them
+    would leak stdin/stdout fakes into unrelated tests in the same run.
+    """
+    yield
+    ask_user_module.configure_streams(sys.stdin, sys.stdout)
+
+
+def test_ask_user_happy_path(ask_user_streams_reset) -> None:
+    stdin = io.StringIO("yes please\n")
+    stdout = io.StringIO()
+    ask_user_module.configure_streams(stdin, stdout)
+    registry = build_registry()
+    result = registry.invoke("ask_user", {"question": "go ahead?"})
+    assert result == "yes please"
+    written = stdout.getvalue()
+    assert "[ask_user] go ahead?" in written
+    assert "> " in written
+
+
+def test_ask_user_strips_trailing_newline(ask_user_streams_reset) -> None:
+    ask_user_module.configure_streams(io.StringIO("answer\n"), io.StringIO())
+    registry = build_registry()
+    assert registry.invoke("ask_user", {"question": "?"}) == "answer"
+
+
+def test_ask_user_strips_crlf(ask_user_streams_reset) -> None:
+    # Same reason interactive.py strips \r\n: piped CRLF input on Unix is real.
+    ask_user_module.configure_streams(io.StringIO("answer\r\n"), io.StringIO())
+    registry = build_registry()
+    assert registry.invoke("ask_user", {"question": "?"}) == "answer"
+
+
+def test_ask_user_empty_response_is_returned_verbatim(
+    ask_user_streams_reset,
+) -> None:
+    # An empty line (just Enter) is a real answer, not EOF.
+    ask_user_module.configure_streams(io.StringIO("\n"), io.StringIO())
+    registry = build_registry()
+    assert registry.invoke("ask_user", {"question": "?"}) == ""
+
+
+def test_ask_user_eof_raises(ask_user_streams_reset) -> None:
+    ask_user_module.configure_streams(io.StringIO(""), io.StringIO())
+    registry = build_registry()
+    with pytest.raises(EOFError):
+        registry.invoke("ask_user", {"question": "anyone there?"})
+
+
+def test_ask_user_non_string_question_raises(ask_user_streams_reset) -> None:
+    ask_user_module.configure_streams(io.StringIO("ignored\n"), io.StringIO())
+    registry = build_registry()
+    with pytest.raises(ValueError):
+        registry.invoke("ask_user", {"question": 42})
+
+
+def test_ask_user_eof_through_loop_surfaces_as_tool_error(
+    ask_user_streams_reset, tmp_path
+) -> None:
+    """An EOFError in the handler should reach the model as a text result.
+
+    Verifies the spec's end-to-end story: `_dispatch` catches `EOFError` like
+    any other tool exception, formats it as `error: EOFError: ...`, and the
+    model sees that string in its next `model_call`.
+    """
+    from filament.agent import run_agent
+    from filament.session import Session
+    from filament.types import Response, ToolCall
+
+    class FakeClient:
+        def __init__(self, scripted: list[Response]) -> None:
+            self._scripted = list(scripted)
+            self.calls: list[list] = []
+
+        def complete(self, messages, tools):
+            self.calls.append(list(messages))
+            return self._scripted.pop(0)
+
+    ask_user_module.configure_streams(io.StringIO(""), io.StringIO())
+    client = FakeClient(
+        [
+            Response(
+                tool_calls=[
+                    ToolCall(id="c1", name="ask_user", arguments={"question": "x?"})
+                ]
+            ),
+            Response(final_text="couldn't get an answer"),
+        ]
+    )
+    registry = build_registry()
+    with Session(tmp_path / "s.jsonl") as session:
+        result = run_agent("ask me", client, registry, session, "fake")
+    assert result == "couldn't get an answer"
+    second_call_messages = client.calls[1]
+    tool_message = second_call_messages[-1]
+    assert tool_message.role == "tool"
+    assert tool_message.content.startswith("error: EOFError: ")
