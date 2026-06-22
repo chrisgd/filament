@@ -1,9 +1,10 @@
 # Filament
 
-A minimal agent harness for the Diercks School of Advanced Computing. A Python
-CLI that runs a read/decide/act/observe loop against either Rosie (an
-open-weights model served by vLLM with an OpenAI-compatible API) or the
-Anthropic Messages API.
+Filament is a minimal agent harness for the Diercks School of Advanced 
+Computing (DSAC @ MSOE) primarily for teaching/learning about agents. 
+This Python-based CLI runs a read/decide/act/observe loop against either Rosie,
+the MSOE supercomputer, via an open-weights model served by vLLM with an 
+OpenAI-compatible API, or the Anthropic Messages API.
 
 ## Installation
 To install and run this, do the following:
