@@ -6,6 +6,7 @@ it and register it in `build_registry` below. Nothing else changes.
 
 from __future__ import annotations
 
+from .ask_user import ask_user_tool
 from .base import Registry, Tool
 from .read_file import read_file_tool
 from .run_shell import run_shell_tool
@@ -20,4 +21,5 @@ def build_registry() -> Registry:
     registry.register(read_file_tool)
     registry.register(write_file_tool)
     registry.register(run_shell_tool)
+    registry.register(ask_user_tool)
     return registry

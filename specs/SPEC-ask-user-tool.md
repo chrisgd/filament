@@ -67,7 +67,7 @@ Refactored 4 references across 3 files. Tests pass.
 
 - **EOF while waiting for a response** (Ctrl-D, piped input exhausted): the handler raises `EOFError`. `agent._dispatch` catches it and returns `error: EOFError: …` as the tool result. The model sees the error in conversation and decides what to do (usually emits a final text saying it couldn't get a response). No special-casing in the agent loop.
 - **Empty response** (user just hits Enter): treated as a real empty-string answer and returned verbatim. The model can interpret as it likes — possibly re-asking.
-- **Whitespace-only response**: returned as-is, after stripping only the trailing newline. The model can decide how to interpret.
+- **Whitespace-only response**: returned as-is, after stripping the trailing line ending (`\r\n` or `\n`). The model can decide how to interpret. Both endings are trimmed for the same reason `interactive.py` does it (per issue 13): piped CRLF input on Unix is real, and a stray `\r` left on the response would corrupt the model's view of the answer.
 - **Multiple lines pasted at once**: only the first line is consumed. Subsequent lines are read by whoever owns stdin next (the interactive read-loop, or a subsequent `ask_user` call). Documented limitation.
 
 ## Internal design
@@ -109,7 +109,7 @@ def _handler(arguments: dict[str, object]) -> str:
     line = _input_stream.readline()
     if line == "":
         raise EOFError("ask_user: stdin closed before user responded")
-    return line.rstrip("\n")
+    return line.rstrip("\r\n")
 ```
 
 ### Stream configuration

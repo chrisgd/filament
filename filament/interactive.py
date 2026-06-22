@@ -15,6 +15,7 @@ import httpx
 from .agent import Conversation
 from .model_clients.base import ModelClient
 from .session import Session
+from .tools import ask_user as ask_user_module
 from .tools.base import Registry
 from .types import Message
 
@@ -114,52 +115,64 @@ def run_interactive(
     continues; mid-turn Ctrl-C escapes (the model call is a blocking
     `httpx.post` — documented limitation, see @specs/SPEC-interactive.md).
     """
-    reporter = ConsoleReporter(stdout)
-    conversation = Conversation(
-        client, registry, session, backend, reporter=reporter
-    )
-    print(_BANNER, file=stdout)
+    # Redirect the ask_user tool's streams to the same stdin/stdout the
+    # read-loop is using. Without this, a mid-turn ask_user call would block
+    # on real sys.stdin, which is wrong under piped input and deadlocks tests
+    # that drive the loop with io.StringIO. Restored on exit (finally) so a
+    # later in-process caller doesn't inherit dangling references to streams
+    # that have since been closed.
+    ask_user_module.configure_streams(stdin, stdout)
+    try:
+        reporter = ConsoleReporter(stdout)
+        conversation = Conversation(
+            client, registry, session, backend, reporter=reporter
+        )
+        print(_BANNER, file=stdout)
 
-    while True:
-        try:
-            print(_PROMPT, end="", file=stdout, flush=True)
-            line = stdin.readline()
-        except KeyboardInterrupt:
-            print("\ninterrupted.", file=stdout)
-            continue
+        while True:
+            try:
+                print(_PROMPT, end="", file=stdout, flush=True)
+                line = stdin.readline()
+            except KeyboardInterrupt:
+                print("\ninterrupted.", file=stdout)
+                continue
 
-        if line == "":
-            # EOF: stdin closed (Ctrl-D, piped input exhausted).
-            print("", file=stdout)
-            return 0
-
-        line = line.rstrip("\r\n")
-        if not line.strip():
-            # Empty line — re-prompt, no model call.
-            continue
-
-        # Slash commands are recognized only on exact match. Anything else
-        # starting with `/` (e.g. "/etc/hosts has a typo") is a task.
-        if line in _COMMANDS:
-            if line == "/exit":
+            if line == "":
+                # EOF: stdin closed (Ctrl-D, piped input exhausted).
+                print("", file=stdout)
                 return 0
-            if line == "/help":
-                print(_HELP_TEXT, file=stdout)
-                continue
-            if line == "/reset":
-                conversation.reset()
-                print("conversation reset. 1 message (system).", file=stdout)
-                continue
-            if line == "/messages":
-                print(_message_summary(conversation.messages), file=stdout)
+
+            line = line.rstrip("\r\n")
+            if not line.strip():
+                # Empty line — re-prompt, no model call.
                 continue
 
-        try:
-            result = conversation.send(line)
-        except httpx.HTTPError as exc:
-            print(f"error: {type(exc).__name__}: {exc}", file=stderr)
-            continue
-        print(result, file=stdout)
+            # Slash commands are recognized only on exact match. Anything
+            # else starting with `/` (e.g. "/etc/hosts has a typo") is a task.
+            if line in _COMMANDS:
+                if line == "/exit":
+                    return 0
+                if line == "/help":
+                    print(_HELP_TEXT, file=stdout)
+                    continue
+                if line == "/reset":
+                    conversation.reset()
+                    print(
+                        "conversation reset. 1 message (system).", file=stdout
+                    )
+                    continue
+                if line == "/messages":
+                    print(_message_summary(conversation.messages), file=stdout)
+                    continue
+
+            try:
+                result = conversation.send(line)
+            except httpx.HTTPError as exc:
+                print(f"error: {type(exc).__name__}: {exc}", file=stderr)
+                continue
+            print(result, file=stdout)
+    finally:
+        ask_user_module.configure_streams(sys.stdin, sys.stdout)
 
 
 def _message_summary(messages: list[Message]) -> str:
