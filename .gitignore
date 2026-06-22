@@ -222,6 +222,10 @@ workshop/
 # Filament session transcripts (run artifacts)
 filament-sessions/
 
+# Scratch space for files written by agent runs (e.g. write_file output).
+# Not intended for version control.
+tmp/
+
 # Claude Code local config — keep shared agent definitions, ignore the rest
 .claude/*
 !.claude/agents/
