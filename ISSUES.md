@@ -13,7 +13,7 @@ to every fix below.
 
 ## Issue 1 — `run_shell` mangles output when stdout has no trailing newline
 
-**Status:** Done (commit 95c2744)
+**Status:** Done (commit cb41c59)
 **Severity:** Bug (low)
 **Location:** `filament/tools/run_shell.py:26-30`
 
@@ -48,7 +48,7 @@ stdout/stderr end in newlines.
 
 ## Issue 2 — `run_shell` uses a different error convention than the other tools
 
-**Status:** Done (commit ca4b17d)
+**Status:** Done (commit 87ab3e2)
 **Severity:** Design inconsistency (low)
 **Location:** `filament/tools/run_shell.py:24-25`
 
@@ -80,7 +80,7 @@ loop changes are needed.
 
 ## Issue 3 — System prompt is embedded in a user message instead of a system role
 
-**Status:** Done (commit bc3f255)
+**Status:** Done (commit 600956d)
 **Severity:** Design weakness (medium)
 **Location:** `filament/agent.py:38-40`
 
@@ -125,7 +125,7 @@ teachable abstraction.
 
 ## Issue 4 — Empty model output silently terminates the loop
 
-**Status:** Done (commit a3e0160)
+**Status:** Done (commit fc38790)
 **Severity:** Bug (medium)
 **Location:** `filament/model_clients/rosie.py:99`, `filament/model_clients/anthropic.py:127`, `filament/agent.py:48`
 
@@ -164,7 +164,7 @@ makes the failure observable in the transcript. Coordinate with Issue 6 (the
 
 ## Issue 5 — `Registry.schemas()` is misnamed
 
-**Status:** Done (commit 3d874c9)
+**Status:** Done (commit 19b484e)
 **Severity:** Naming (low)
 **Location:** `filament/tools/base.py:40-42`, callers in `filament/agent.py:41`
 
@@ -186,7 +186,7 @@ update the caller in `agent.py`. Pure rename, no behavior change. Check
 
 ## Issue 6 — `Response` "either/or" invariant is documented but unenforced
 
-**Status:** Done (commit 6f80e1f)
+**Status:** Done (commit fecff68)
 **Severity:** Robustness (low)
 **Location:** `filament/types.py:40-49`
 
