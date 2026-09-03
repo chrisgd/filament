@@ -11,6 +11,7 @@ import httpx
 
 from filament import cli
 from filament.config import Config
+from filament.model_clients import ModelResponseError
 
 
 class FakeSession:
@@ -123,3 +124,53 @@ def test_session_closed_on_backend_failure(monkeypatch) -> None:
     session = _stub_runtime(monkeypatch, run_agent=fail)
     cli.main(["do a task"])
     assert session.closed
+
+
+def test_model_response_error_reports_clean_error(monkeypatch, capsys) -> None:
+    # Issue 14: a reply the client cannot translate is reported like a
+    # transport failure, not as a traceback.
+    def fail(*args) -> str:
+        raise ModelResponseError("tool call 'read_file' has malformed JSON arguments")
+
+    session = _stub_runtime(monkeypatch, run_agent=fail)
+    code = cli.main(["do a task"])
+    assert code == 1
+    err = capsys.readouterr().err
+    assert "error: ModelResponseError: tool call 'read_file'" in err
+    assert session.closed
+
+
+def _status_error(status: int, body: str) -> httpx.HTTPStatusError:
+    """An HTTPStatusError as `raise_for_status()` would build it, offline."""
+    request = httpx.Request("POST", "https://backend.example/v1/messages")
+    response = httpx.Response(status, text=body, request=request)
+    return httpx.HTTPStatusError(
+        f"Client error '{status}'", request=request, response=response
+    )
+
+
+def test_http_status_error_prints_response_body(monkeypatch, capsys) -> None:
+    # Issue 15: the status line says only "400 Bad Request"; the backend's
+    # explanation lives in the body and must reach the user.
+    body = '{"type":"error","error":{"message":"model not found"}}'
+
+    def fail(*args) -> str:
+        raise _status_error(404, body)
+
+    _stub_runtime(monkeypatch, run_agent=fail)
+    code = cli.main(["do a task"])
+    assert code == 1
+    err = capsys.readouterr().err
+    assert "error: HTTPStatusError" in err
+    assert "model not found" in err
+
+
+def test_http_status_error_with_empty_body_prints_no_body_line(
+    monkeypatch, capsys
+) -> None:
+    def fail(*args) -> str:
+        raise _status_error(502, "")
+
+    _stub_runtime(monkeypatch, run_agent=fail)
+    cli.main(["do a task"])
+    assert "response body" not in capsys.readouterr().err

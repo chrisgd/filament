@@ -20,7 +20,12 @@ from filament.model_clients.anthropic import (
     _system_prompt,
     _to_wire_messages,
 )
-from filament.model_clients.rosie import RosieClient, _to_wire_message
+from filament.model_clients.base import ModelResponseError
+from filament.model_clients.rosie import (
+    RosieClient,
+    _from_wire_response,
+    _to_wire_message,
+)
 from filament.types import Message
 
 
@@ -69,3 +74,48 @@ def test_anthropic_lifts_system_into_top_level_param() -> None:
 def test_anthropic_system_prompt_empty_without_system_message() -> None:
     messages = [Message(role="user", content="Task: greet")]
     assert _system_prompt(messages) == ""
+
+
+def _rosie_tool_call_payload(arguments: str) -> dict:
+    """A chat-completions reply carrying one tool call with the given args."""
+    return {
+        "choices": [
+            {
+                "message": {
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "read_file",
+                                "arguments": arguments,
+                            },
+                        }
+                    ],
+                }
+            }
+        ]
+    }
+
+
+def test_rosie_parses_tool_call_arguments() -> None:
+    response = _from_wire_response(
+        _rosie_tool_call_payload('{"path": "README.md"}')
+    )
+    assert response.final_text is None
+    assert [call.name for call in response.tool_calls] == ["read_file"]
+    assert response.tool_calls[0].arguments == {"path": "README.md"}
+
+
+def test_rosie_malformed_tool_call_json_raises_model_response_error() -> None:
+    # Issue 14: open-weights models under vLLM emit truncated argument JSON
+    # often enough to matter. That must surface as a Filament error, not as
+    # a JSONDecodeError escaping the client.
+    with pytest.raises(ModelResponseError, match="malformed JSON"):
+        _from_wire_response(_rosie_tool_call_payload('{"path": "README.md'))
+
+
+def test_rosie_non_object_tool_call_arguments_raise_model_response_error() -> None:
+    with pytest.raises(ModelResponseError, match="JSON object"):
+        _from_wire_response(_rosie_tool_call_payload('["README.md"]'))

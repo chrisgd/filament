@@ -69,7 +69,7 @@ This is the second most common extension. Follow this procedure:
 
 1. Create `filament/model_clients/<backend_name>.py`.
 2. Implement a class with a `complete(self, messages: list[Message], tools: list[Tool]) -> Response` method conforming to the `ModelClient` Protocol in `base.py`.
-3. The client translates internal types to the backend's wire format on the way out, and the backend's response back to a `Response` on the way in. Wire-format details must not leak.
+3. The client translates internal types to the backend's wire format on the way out, and the backend's response back to a `Response` on the way in. Wire-format details must not leak. If the reply cannot be translated, raise `ModelResponseError` (defined in `base.py`) rather than letting a parsing exception escape; the CLI reports it as a clean error line.
 4. Add the backend to the factory in `filament/model_clients/__init__.py`, keyed on a new `FILAMENT_BACKEND` value.
 5. Add config variables in `filament/config.py`.
 6. Write a contract test marked `@pytest.mark.integration` that hits the real backend with a trivial completion.
