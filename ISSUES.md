@@ -521,6 +521,72 @@ provider-specific error shapes.
 
 ---
 
+## Issue 16 — The model's text is dropped when a turn also carries tool calls
+
+**Status:** Open
+**Severity:** Design weakness (medium)
+**Location:** `filament/types.py:53`, `filament/model_clients/anthropic.py:143`, `filament/model_clients/rosie.py:95`
+
+### Problem
+Both wire formats let one turn carry text and tool calls together, and
+models use that constantly: "Let me read the README first" followed by the
+call. `Response` forbids the combination (issue 6 enforced it), so both
+clients discard the text whenever tool calls are present. It never reaches
+the transcript, the next model call, or the user. The replayed conversation
+is also unfaithful: the assistant turn the backend sees on the next call is
+missing words it actually said. `Message` already supports content alongside
+`tool_calls`, and the Anthropic client's text-plus-`tool_use` branch at
+`anthropic.py:100` is dead code because nothing can produce that shape.
+
+For a harness whose purpose is to make the loop legible, the interstitial
+text is the most legible thing the model does.
+
+### Fix
+Rename `Response.final_text` to `text` and drop the either/or invariant: a
+turn with tool calls is not final whatever its text; a turn with neither is
+empty output. Both clients keep the text. The loop records it on the
+assistant message beside the tool calls; its control flow is otherwise
+unchanged. The transcript's `model_response` event carries `text` instead of
+`final_text`.
+
+### Acceptance criteria
+- A turn with text and tool calls stores both on the assistant message; the
+  next `model_call` sees the text; the transcript records it.
+- Both clients preserve the text; the Anthropic client renders the assistant
+  text block before its `tool_use` blocks on replay.
+- Existing loop and interactive tests pass after the rename.
+
+---
+
+## Issue 17 — Output cut off at the token limit is indistinguishable from a complete answer
+
+**Status:** Open
+**Severity:** Bug (medium)
+**Location:** `filament/model_clients/anthropic.py:128`, `filament/model_clients/rosie.py:91`, `filament/agent.py`
+
+### Problem
+Neither client reads the backend's stop reason (`stop_reason` on Anthropic,
+`finish_reason` on Rosie). A reply cut off at `max_tokens` (4096 in the
+Anthropic client) comes back as ordinary text and the loop treats it as a
+finished answer. Worse, a `write_file` call whose body exceeds the cap loses
+its `tool_use` block, and the loop then reports "model returned empty
+output", sending the student to debug the wrong thing.
+
+### Fix
+Add `Response.truncated: bool`, set by each client from its backend's stop
+reason (`max_tokens` / `length`). A truncated turn carries only its text;
+the client does not parse tool calls that may have been cut mid-way. The
+loop checks the flag before anything else and stops with an explicit
+sentinel, keeping any partial text so the user sees what came back.
+
+### Acceptance criteria
+- A truncated turn produces a visibly distinct result and is never
+  dispatched.
+- The transcript's `model_response` event records `truncated`.
+- Both clients map their stop reason; offline tests cover both.
+
+---
+
 ## Resolved / Not an issue
 
 ### Explanatory comments in `cli.py` `main()` — INTENTIONAL, no action
