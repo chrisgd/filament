@@ -78,6 +78,12 @@ def main(argv: list[str] | None = None) -> int:
         # could not translate is reported as a clean line, not surfaced to
         # the user as an unhandled traceback
         print(f"error: {type(exc).__name__}: {exc}", file=sys.stderr)
+        if isinstance(exc, httpx.HTTPStatusError):
+            # the status line only says e.g. "400 Bad Request"; the body is
+            # where the backend says why
+            body = exc.response.text.strip()
+            if body:
+                print(f"response body: {body}", file=sys.stderr)
         return 1
     finally:
         session.close()

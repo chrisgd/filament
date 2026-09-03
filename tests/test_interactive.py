@@ -312,3 +312,26 @@ def test_console_reporter_handles_tool_call_with_no_arguments() -> None:
     reporter.tool_call("ping", {})
     line = out.getvalue()
     assert line == "[tool] ping\n"
+
+
+def test_http_status_error_inside_a_turn_prints_response_body(tmp_path) -> None:
+    # Issue 15: same as the one-shot path; the body reaches stderr and the
+    # loop continues.
+    request = httpx.Request("POST", "https://backend.example/v1/messages")
+    response = httpx.Response(
+        400,
+        text='{"error":{"message":"max_tokens too large"}}',
+        request=request,
+    )
+    client = FailThenSucceed(
+        httpx.HTTPStatusError(
+            "Client error '400'", request=request, response=response
+        )
+    )
+    code, out, err = _run(
+        tmp_path, client, "first try\nsecond try\n/exit\n"
+    )
+    assert code == 0
+    assert "error: HTTPStatusError" in err
+    assert "max_tokens too large" in err
+    assert "recovered" in out

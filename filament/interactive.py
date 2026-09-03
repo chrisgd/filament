@@ -170,6 +170,12 @@ def run_interactive(
                 result = conversation.send(line)
             except (httpx.HTTPError, ModelResponseError) as exc:
                 print(f"error: {type(exc).__name__}: {exc}", file=stderr)
+                if isinstance(exc, httpx.HTTPStatusError):
+                    # the status line only says e.g. "400 Bad Request"; the
+                    # body is where the backend says why
+                    body = exc.response.text.strip()
+                    if body:
+                        print(f"response body: {body}", file=stderr)
                 continue
             print(result, file=stdout)
     finally:
