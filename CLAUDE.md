@@ -109,6 +109,7 @@ filament/
     ├── run_shell.py
     └── ask_user.py
 tests/
+├── fakes.py                        # Shared offline test doubles (FakeClient, registry_with, ...)
 ├── test_cli.py
 ├── test_tools.py
 ├── test_agent.py

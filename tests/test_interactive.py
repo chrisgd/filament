@@ -13,22 +13,9 @@ import httpx
 from filament.interactive import ConsoleReporter, run_interactive
 from filament.model_clients.base import ModelResponseError
 from filament.session import Session
-from filament.tools.base import Registry, Tool
-from filament.types import Message, Response, ToolCall
-
-
-class FakeClient:
-    """Replays a scripted list of Responses. Same pattern as test_agent.py."""
-
-    def __init__(self, scripted: list[Response]) -> None:
-        self._scripted = list(scripted)
-        self.calls: list[list[Message]] = []
-
-    def complete(
-        self, messages: list[Message], tools: list[Tool]
-    ) -> Response:
-        self.calls.append(list(messages))
-        return self._scripted.pop(0)
+from filament.tools.base import Registry
+from filament.types import Response, ToolCall
+from tests.fakes import FailThenSucceed, FakeClient, registry_with, status_error
 
 
 def _run(
@@ -147,22 +134,6 @@ def test_crlf_slash_commands_are_recognized(tmp_path) -> None:
     assert user_message.content == "Task: first task"
 
 
-class FailThenSucceed:
-    """Raises `error` on the first model call, then returns a final text."""
-
-    def __init__(self, error: Exception) -> None:
-        self._error = error
-        self.call_count = 0
-
-    def complete(
-        self, messages: list[Message], tools: list[Tool]
-    ) -> Response:
-        self.call_count += 1
-        if self.call_count == 1:
-            raise self._error
-        return Response(text="recovered")
-
-
 def test_httpx_error_inside_a_turn_does_not_kill_the_loop(tmp_path) -> None:
     client = FailThenSucceed(httpx.ConnectError("connection refused"))
     code, out, err = _run(
@@ -188,19 +159,6 @@ def test_model_response_error_inside_a_turn_does_not_kill_the_loop(
     assert "error: ModelResponseError: malformed tool-call arguments" in err
     assert "recovered" in out
     assert client.call_count == 2
-
-
-def _registry_with(name: str, handler) -> Registry:
-    registry = Registry()
-    registry.register(
-        Tool(
-            name=name,
-            description="test tool",
-            parameters={"type": "object", "properties": {}},
-            handler=handler,
-        )
-    )
-    return registry
 
 
 def _run_with_registry(
@@ -240,7 +198,7 @@ def test_interactive_emits_activity_signals_around_turn(tmp_path) -> None:
             Response(text="summary text"),
         ]
     )
-    registry = _registry_with("read_file", lambda args: "FILE CONTENT")
+    registry = registry_with("read_file", lambda args: "FILE CONTENT")
     _, out, _ = _run_with_registry(
         tmp_path, client, registry, "read README\n/exit\n"
     )
@@ -272,7 +230,7 @@ def test_interactive_renders_tool_error_with_error_type(tmp_path) -> None:
             Response(text="recovered"),
         ]
     )
-    registry = _registry_with("bad", boom)
+    registry = registry_with("bad", boom)
     _, out, _ = _run_with_registry(
         tmp_path, client, registry, "try it\n/exit\n"
     )
@@ -317,16 +275,8 @@ def test_console_reporter_handles_tool_call_with_no_arguments() -> None:
 def test_http_status_error_inside_a_turn_prints_response_body(tmp_path) -> None:
     # Issue 15: same as the one-shot path; the body reaches stderr and the
     # loop continues.
-    request = httpx.Request("POST", "https://backend.example/v1/messages")
-    response = httpx.Response(
-        400,
-        text='{"error":{"message":"max_tokens too large"}}',
-        request=request,
-    )
     client = FailThenSucceed(
-        httpx.HTTPStatusError(
-            "Client error '400'", request=request, response=response
-        )
+        status_error(400, '{"error":{"message":"max_tokens too large"}}')
     )
     code, out, err = _run(
         tmp_path, client, "first try\nsecond try\n/exit\n"

@@ -219,15 +219,7 @@ def test_ask_user_eof_through_loop_surfaces_as_tool_error(
     from filament.agent import run_agent
     from filament.session import Session
     from filament.types import Response, ToolCall
-
-    class FakeClient:
-        def __init__(self, scripted: list[Response]) -> None:
-            self._scripted = list(scripted)
-            self.calls: list[list] = []
-
-        def complete(self, messages, tools):
-            self.calls.append(list(messages))
-            return self._scripted.pop(0)
+    from tests.fakes import FakeClient
 
     ask_user_module.configure_streams(io.StringIO(""), io.StringIO())
     client = FakeClient(

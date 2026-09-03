@@ -223,3 +223,28 @@ def test_rosie_stop_is_not_truncated() -> None:
     response = _rosie_from_wire_response(payload)
     assert response.truncated is False
     assert response.text == "done"
+
+
+def test_anthropic_coalesces_consecutive_tool_results_into_one_user_message() -> None:
+    # The Messages API wants every tool_result for one assistant turn in a
+    # single user message; splitting them degrades parallel tool use.
+    messages = [
+        Message(role="user", content="Task: go"),
+        Message(
+            role="assistant",
+            content=None,
+            tool_calls=[
+                ToolCall(id="t1", name="a", arguments={}),
+                ToolCall(id="t2", name="b", arguments={}),
+            ],
+        ),
+        Message(role="tool", content="r1", tool_call_id="t1", name="a"),
+        Message(role="tool", content="r2", tool_call_id="t2", name="b"),
+        Message(role="user", content="Task: next"),
+    ]
+    wire = _to_wire_messages(messages)
+    assert [m["role"] for m in wire] == ["user", "assistant", "user", "user"]
+    results = wire[2]["content"]
+    assert [block["type"] for block in results] == ["tool_result", "tool_result"]
+    assert [block["tool_use_id"] for block in results] == ["t1", "t2"]
+    assert [block["content"] for block in results] == ["r1", "r2"]
