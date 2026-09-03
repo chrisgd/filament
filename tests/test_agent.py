@@ -293,8 +293,8 @@ class RecordingReporter:
     def model_call_start(self, iteration: int) -> None:
         self.events.append(("model_call_start", iteration))
 
-    def model_call_end(self) -> None:
-        self.events.append(("model_call_end",))
+    def model_call_end(self, response: Response) -> None:
+        self.events.append(("model_call_end", response.text))
 
     def tool_call(self, name: str, arguments: dict) -> None:
         self.events.append(("tool_call", name, dict(arguments)))
@@ -325,11 +325,11 @@ def test_reporter_fires_at_each_loop_transition(tmp_path) -> None:
         ).send("ping it")
     assert reporter.events == [
         ("model_call_start", 1),
-        ("model_call_end",),
+        ("model_call_end", None),
         ("tool_call", "ping", {"x": 1}),
         ("tool_result", "ping", "pong"),
         ("model_call_start", 2),
-        ("model_call_end",),
+        ("model_call_end", "done"),
     ]
 
 

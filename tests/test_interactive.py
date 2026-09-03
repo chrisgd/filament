@@ -285,3 +285,44 @@ def test_http_status_error_inside_a_turn_prints_response_body(tmp_path) -> None:
     assert "error: HTTPStatusError" in err
     assert "max_tokens too large" in err
     assert "recovered" in out
+
+
+def test_console_reporter_keeps_multiline_values_on_one_line() -> None:
+    # Issue 18: a newline inside an argument value must not break the
+    # one-line-per-event rule; it is shown escaped.
+    out = io.StringIO()
+    ConsoleReporter(out).tool_call(
+        "write_file", {"path": "x.py", "content": "line one\nline two"}
+    )
+    line = out.getvalue()
+    assert line.count("\n") == 1
+    assert 'content="line one\\nline two"' in line
+
+
+def test_interactive_prints_interstitial_text_before_tool_lines(tmp_path) -> None:
+    # Text the model says alongside a tool call is shown bare, between the
+    # [thinking...] and [tool] lines. The final answer is printed once, by
+    # the read-loop, not again by the reporter.
+    client = FakeClient(
+        [
+            Response(
+                text="Let me read it first.",
+                tool_calls=[
+                    ToolCall(
+                        id="c1", name="read_file", arguments={"path": "README.md"}
+                    )
+                ],
+            ),
+            Response(text="summary text"),
+        ]
+    )
+    registry = registry_with("read_file", lambda args: "FILE CONTENT")
+    _, out, _ = _run_with_registry(
+        tmp_path, client, registry, "read README\n/exit\n"
+    )
+    assert (
+        out.index("[thinking...]")
+        < out.index("Let me read it first.")
+        < out.index("[tool] read_file")
+    )
+    assert out.count("summary text") == 1

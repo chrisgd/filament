@@ -37,6 +37,7 @@ filament interactive mode. /help for commands, /exit to quit.
 
 > read the README and summarize it
 [thinking...]
+Let me read the README first.
 [tool] read_file path="README.md"
 [tool ok] read_file (412 bytes)
 [thinking...]
@@ -53,7 +54,7 @@ The README describes Filament's architecture: a four-layer harness with...
 - `[tool] <name> <key>="<value>" ...` prints when the loop dispatches a tool. Arguments are rendered as `key="value"` pairs in dict-iteration order; values longer than ~60 characters are truncated with a trailing `...`.
 - `[tool ok] <name> (<N> bytes)` prints when a tool succeeds. `N` is `len(result)` of the returned string.
 - `[tool err] <name>: <ErrorType>` prints when a tool raised — the loop's `_dispatch` already turns the exception into `error: <ErrorType>: <message>`, and the reporter surfaces just the type to keep the line compact. The full message remains in the transcript and in the model's next message context.
-- No event-line is printed by `ConsoleReporter` for `model_call_end`. The hook still fires for consistency, but the final text or the next `[tool]` line is already a sufficient signal that the call returned.
+- `model_call_end` receives the `Response`. `ConsoleReporter` prints the model's text bare when the turn also carries tool calls (`Let me read the README first.`): bracketed lines are the harness, bare lines are the model. A final answer is not printed here; the read-loop prints it as the turn's result, so it appears once.
 
 ### Edge cases
 
@@ -71,7 +72,7 @@ from typing import Protocol
 
 class TurnReporter(Protocol):
     def model_call_start(self, iteration: int) -> None: ...
-    def model_call_end(self) -> None: ...
+    def model_call_end(self, response: Response) -> None: ...
     def tool_call(self, name: str, arguments: dict[str, object]) -> None: ...
     def tool_result(self, name: str, result: str) -> None: ...
 ```
@@ -95,7 +96,7 @@ class Conversation:
 In `send()`, the reporter fires at the same four points where `session.log_*` already fires:
 
 - Just before `self._client.complete(...)` → `reporter.model_call_start(iteration)`.
-- Just after the model returns, before processing the response → `reporter.model_call_end()`.
+- Just after the model returns, before processing the response → `reporter.model_call_end(response)`.
 - Just before each `_dispatch(registry, name, arguments)` → `reporter.tool_call(name, arguments)`.
 - Just after `_dispatch` returns → `reporter.tool_result(name, result)`. The `result` string is whatever `_dispatch` returned, including the `error: ...` form for tool exceptions.
 
@@ -111,8 +112,9 @@ class ConsoleReporter:
     def model_call_start(self, iteration: int) -> None:
         print("[thinking...]", file=self._stream, flush=True)
 
-    def model_call_end(self) -> None:
-        pass  # the final text or next [tool] line is the visible signal
+    def model_call_end(self, response: Response) -> None:
+        if response.tool_calls and response.text:
+            print(response.text, file=self._stream, flush=True)
 
     def tool_call(self, name: str, arguments: dict[str, object]) -> None:
         rendered = _format_args(arguments)
@@ -166,7 +168,7 @@ No change to `cli.py`. No change to `run_agent`.
 
 All tests offline. Reuse the existing `FakeClient` pattern from `tests/test_agent.py`.
 
-- **`tests/test_agent.py` — reporter dispatch.** Define a `RecordingReporter` test double that appends each call (with args) to a list. Construct a `Conversation` with a `FakeClient` scripted for: tool call → tool result → final text. Assert the recorded sequence is exactly `[model_call_start(1), model_call_end, tool_call(name, args), tool_result(name, result), model_call_start(2), model_call_end]`. Separate test: omitting `reporter` produces no calls (verified by the fact that the test fake is never constructed).
+- **`tests/test_agent.py` — reporter dispatch.** Define a `RecordingReporter` test double that appends each call (with args) to a list. Construct a `Conversation` with a `FakeClient` scripted for: tool call → tool result → final text. Assert the recorded sequence is exactly `[model_call_start(1), model_call_end(response), tool_call(name, args), tool_result(name, result), model_call_start(2), model_call_end(response)]`. Separate test: omitting `reporter` produces no calls (verified by the fact that the test fake is never constructed).
 - **`tests/test_interactive.py` — `ConsoleReporter` output.** Drive `run_interactive` with `io.StringIO` for stdin and stdout, scripted `FakeClient`. Assert the captured stdout contains the expected `[thinking...]`, `[tool] read_file path="README.md"`, `[tool ok] read_file (N bytes)`, and final-text lines in order. Edge cases: a tool that returns `"error: FileNotFoundError: ..."` produces `[tool err] read_file: FileNotFoundError`; an argument value longer than 60 chars is truncated in the echoed line.
 - **One-shot regression.** Existing one-shot tests already exercise `run_agent` and don't construct a reporter; add an explicit assertion that the captured stdout from a one-shot invocation contains no `[thinking...]` or `[tool]` substrings. Confirms silence is preserved.
 
@@ -181,3 +183,7 @@ When and if real needs arise, not before:
 - Per-tool result summaries (first line for `read_file`, exit code for `run_shell`).
 - Colorization or TTY-aware styling (a real dependency decision, or a no-deps `\033[...]` approach gated on `isatty()`).
 - A truncation policy for very large tool results in the echoed line (currently shown as `(N bytes)` only; could add a first-N-chars preview).
+
+## Amendments
+
+- 2026-09-02: `model_call_end` receives the `Response`, and `ConsoleReporter` prints the model's interstitial text. Issue 16 made that text available; before it, the hook had nothing to show.
