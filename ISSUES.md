@@ -589,7 +589,7 @@ sentinel, keeping any partial text so the user sees what came back.
 
 ## Issue 18 — Activity lines break on newlines in argument values
 
-**Status:** Open
+**Status:** Done (commit c08ee49)
 **Severity:** Bug (low)
 **Location:** `filament/interactive.py:81` (`_format_args`)
 
