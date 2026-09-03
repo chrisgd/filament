@@ -78,7 +78,10 @@ def _format_args(arguments: dict[str, object]) -> str:
     """
     parts: list[str] = []
     for key, value in arguments.items():
-        text = str(value)
+        # Escape line breaks so one event stays one line; the full value is
+        # in the transcript. Done before truncating so the width limit is
+        # measured on what is printed.
+        text = str(value).replace("\r", "\\r").replace("\n", "\\n")
         if len(text) > _ARG_VALUE_MAX:
             text = text[: _ARG_VALUE_MAX - len(_ARG_TRUNCATION_SUFFIX)] + _ARG_TRUNCATION_SUFFIX
         parts.append(f'{key}="{text}"')

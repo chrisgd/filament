@@ -285,3 +285,15 @@ def test_http_status_error_inside_a_turn_prints_response_body(tmp_path) -> None:
     assert "error: HTTPStatusError" in err
     assert "max_tokens too large" in err
     assert "recovered" in out
+
+
+def test_console_reporter_keeps_multiline_values_on_one_line() -> None:
+    # Issue 18: a newline inside an argument value must not break the
+    # one-line-per-event rule; it is shown escaped.
+    out = io.StringIO()
+    ConsoleReporter(out).tool_call(
+        "write_file", {"path": "x.py", "content": "line one\nline two"}
+    )
+    line = out.getvalue()
+    assert line.count("\n") == 1
+    assert 'content="line one\\nline two"' in line
