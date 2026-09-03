@@ -587,6 +587,30 @@ sentinel, keeping any partial text so the user sees what came back.
 
 ---
 
+## Issue 18 — Activity lines break on newlines in argument values
+
+**Status:** Open
+**Severity:** Bug (low)
+**Location:** `filament/interactive.py:81` (`_format_args`)
+
+### Problem
+`_format_args` stringifies each argument value as-is before truncating. A
+`write_file` call whose `content` has a newline in its first 60 characters
+produces a `[tool]` line that spans several terminal lines, against the
+activity-signals spec's one-line-per-event rule. Only the echoed line is
+affected; the full value is in the transcript.
+
+### Fix
+Escape `\n` and `\r` in the rendered value before truncating, so one event
+stays one line and the truncation width is measured on what is printed.
+
+### Acceptance criteria
+- A multi-line argument value renders as one `[tool]` line with the line
+  break shown as `\n`.
+- Test in `tests/test_interactive.py`.
+
+---
+
 ## Resolved / Not an issue
 
 ### Explanatory comments in `cli.py` `main()` — INTENTIONAL, no action
