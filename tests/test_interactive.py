@@ -11,6 +11,7 @@ import io
 import httpx
 
 from filament.interactive import ConsoleReporter, run_interactive
+from filament.model_clients.base import ModelResponseError
 from filament.session import Session
 from filament.tools.base import Registry, Tool
 from filament.types import Message, Response, ToolCall
@@ -146,26 +147,45 @@ def test_crlf_slash_commands_are_recognized(tmp_path) -> None:
     assert user_message.content == "Task: first task"
 
 
+class FailThenSucceed:
+    """Raises `error` on the first model call, then returns a final text."""
+
+    def __init__(self, error: Exception) -> None:
+        self._error = error
+        self.call_count = 0
+
+    def complete(
+        self, messages: list[Message], tools: list[Tool]
+    ) -> Response:
+        self.call_count += 1
+        if self.call_count == 1:
+            raise self._error
+        return Response(final_text="recovered")
+
+
 def test_httpx_error_inside_a_turn_does_not_kill_the_loop(tmp_path) -> None:
-    class FailThenSucceed:
-        def __init__(self) -> None:
-            self.call_count = 0
-
-        def complete(
-            self, messages: list[Message], tools: list[Tool]
-        ) -> Response:
-            self.call_count += 1
-            if self.call_count == 1:
-                raise httpx.ConnectError("connection refused")
-            return Response(final_text="recovered")
-
-    client = FailThenSucceed()
+    client = FailThenSucceed(httpx.ConnectError("connection refused"))
     code, out, err = _run(
         tmp_path, client, "first try\nsecond try\n/exit\n"
     )
     assert code == 0
     assert "error:" in err
     assert "ConnectError" in err
+    assert "recovered" in out
+    assert client.call_count == 2
+
+
+def test_model_response_error_inside_a_turn_does_not_kill_the_loop(
+    tmp_path,
+) -> None:
+    # Issue 14: a reply the client can't translate (e.g. malformed tool-call
+    # JSON from an open-weights model) must not take the session down.
+    client = FailThenSucceed(ModelResponseError("malformed tool-call arguments"))
+    code, out, err = _run(
+        tmp_path, client, "first try\nsecond try\n/exit\n"
+    )
+    assert code == 0
+    assert "error: ModelResponseError: malformed tool-call arguments" in err
     assert "recovered" in out
     assert client.call_count == 2
 

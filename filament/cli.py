@@ -15,7 +15,7 @@ import httpx
 from .agent import run_agent
 from .config import load_config
 from .interactive import run_interactive
-from .model_clients import build_client
+from .model_clients import ModelResponseError, build_client
 from .session import new_session
 from .tools import build_registry
 
@@ -73,9 +73,10 @@ def main(argv: list[str] | None = None) -> int:
         result = run_agent(
             args.task, client, registry, session, config.backend
         )
-    except httpx.HTTPError as exc:
-        # a backend or transport failure is reported as a clean line,
-        # not surfaced to the user as an unhandled traceback
+    except (httpx.HTTPError, ModelResponseError) as exc:
+        # a transport failure, an HTTP error status, or a reply the client
+        # could not translate is reported as a clean line, not surfaced to
+        # the user as an unhandled traceback
         print(f"error: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
     finally:

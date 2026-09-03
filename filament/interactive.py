@@ -13,7 +13,7 @@ from typing import TextIO
 import httpx
 
 from .agent import Conversation
-from .model_clients.base import ModelClient
+from .model_clients.base import ModelClient, ModelResponseError
 from .session import Session
 from .tools import ask_user as ask_user_module
 from .tools.base import Registry
@@ -109,11 +109,12 @@ def run_interactive(
 ) -> int:
     """Drive a multi-turn conversation from `stdin`.
 
-    Returns 0 on clean exit (`/exit`, EOF). `httpx` errors from the model
-    client are caught, printed to `stderr` as `error: ...`, and the loop
-    continues. `KeyboardInterrupt` between turns is caught and the loop
-    continues; mid-turn Ctrl-C escapes (the model call is a blocking
-    `httpx.post` — documented limitation, see @specs/SPEC-interactive.md).
+    Returns 0 on clean exit (`/exit`, EOF). `httpx` errors and
+    `ModelResponseError` from the model client are caught, printed to
+    `stderr` as `error: ...`, and the loop continues. `KeyboardInterrupt`
+    between turns is caught and the loop continues; mid-turn Ctrl-C escapes
+    (the model call is a blocking `httpx.post` — documented limitation, see
+    @specs/SPEC-interactive.md).
     """
     # Redirect the ask_user tool's streams to the same stdin/stdout the
     # read-loop is using. Without this, a mid-turn ask_user call would block
@@ -167,7 +168,7 @@ def run_interactive(
 
             try:
                 result = conversation.send(line)
-            except httpx.HTTPError as exc:
+            except (httpx.HTTPError, ModelResponseError) as exc:
                 print(f"error: {type(exc).__name__}: {exc}", file=stderr)
                 continue
             print(result, file=stdout)

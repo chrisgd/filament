@@ -14,6 +14,7 @@ import httpx
 
 from ..tools.base import Tool
 from ..types import Message, Response, ToolCall
+from .base import ModelResponseError
 
 _TIMEOUT_SECONDS = 120.0
 
@@ -93,16 +94,33 @@ def _from_wire_response(payload: dict[str, Any]) -> Response:
     raw_calls = message.get("tool_calls")
     if raw_calls:
         return Response(
-            tool_calls=[
-                ToolCall(
-                    id=call["id"],
-                    name=call["function"]["name"],
-                    arguments=json.loads(call["function"]["arguments"] or "{}"),
-                )
-                for call in raw_calls
-            ]
+            tool_calls=[_from_wire_tool_call(call) for call in raw_calls]
         )
     content = message.get("content")
     if content:
         return Response(final_text=content)
     return Response()
+
+
+def _from_wire_tool_call(call: dict[str, Any]) -> ToolCall:
+    """Parse one OpenAI-format tool call. Its arguments arrive as a JSON string.
+
+    Open-weights models sometimes emit arguments that are not valid JSON, or
+    are valid JSON but not an object. Neither can become a `ToolCall`, so
+    raise `ModelResponseError` rather than let `json.loads` escape as a
+    traceback. The raw text is included so a reader can see what the model
+    actually produced.
+    """
+    name = call["function"]["name"]
+    raw = call["function"]["arguments"] or "{}"
+    try:
+        arguments = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ModelResponseError(
+            f"tool call {name!r} has malformed JSON arguments ({exc}): {raw!r}"
+        ) from exc
+    if not isinstance(arguments, dict):
+        raise ModelResponseError(
+            f"tool call {name!r} arguments must be a JSON object: {raw!r}"
+        )
+    return ToolCall(id=call["id"], name=name, arguments=arguments)

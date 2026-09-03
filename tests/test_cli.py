@@ -11,6 +11,7 @@ import httpx
 
 from filament import cli
 from filament.config import Config
+from filament.model_clients import ModelResponseError
 
 
 class FakeSession:
@@ -122,4 +123,18 @@ def test_session_closed_on_backend_failure(monkeypatch) -> None:
 
     session = _stub_runtime(monkeypatch, run_agent=fail)
     cli.main(["do a task"])
+    assert session.closed
+
+
+def test_model_response_error_reports_clean_error(monkeypatch, capsys) -> None:
+    # Issue 14: a reply the client cannot translate is reported like a
+    # transport failure, not as a traceback.
+    def fail(*args) -> str:
+        raise ModelResponseError("tool call 'read_file' has malformed JSON arguments")
+
+    session = _stub_runtime(monkeypatch, run_agent=fail)
+    code = cli.main(["do a task"])
+    assert code == 1
+    err = capsys.readouterr().err
+    assert "error: ModelResponseError: tool call 'read_file'" in err
     assert session.closed

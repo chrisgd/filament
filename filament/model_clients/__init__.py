@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from ..config import Config
 from .anthropic import AnthropicClient
-from .base import ModelClient
+from .base import ModelClient, ModelResponseError
 from .rosie import RosieClient
 
-__all__ = ["ModelClient", "build_client"]
+__all__ = ["ModelClient", "ModelResponseError", "build_client"]
 
 
 def build_client(config: Config) -> ModelClient:
