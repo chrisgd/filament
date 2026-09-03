@@ -51,7 +51,7 @@ If you find yourself reaching for a raw API response shape outside of a model cl
 This is the most common extension that will be made. Follow this exact procedure:
 
 1. Create `filament/tools/<your_tool_name>.py`.
-2. In that module, define a `Tool` instance with `name`, `description`, `parameters` (a JSON Schema dict), and `handler` (a function taking a dict, returning a string).
+2. In that module, define a `Tool` instance with `name`, `description`, `parameters` (a JSON Schema dict), and `handler` (a function taking a dict, returning a string). If the tool touches the filesystem, resolve paths through `tools/workdir.resolve_within` so the working-directory boundary holds (see @specs/SPEC-workdir-boundary.md).
 3. Import the instance from the module in `filament/tools/__init__.py` and add it to the registry.
 4. Add tests in `tests/test_tools.py` covering at least the happy path and one error case. Tests must not require the LLM.
 
@@ -103,9 +103,11 @@ filament/
 └── tools/
     ├── __init__.py                 # Registry and tool registration
     ├── base.py                     # Tool dataclass and Registry class
+    ├── workdir.py                  # Working-directory boundary shared by the file/shell tools
     ├── read_file.py
     ├── write_file.py
-    └── run_shell.py
+    ├── run_shell.py
+    └── ask_user.py
 tests/
 ├── test_cli.py
 ├── test_tools.py
@@ -115,7 +117,9 @@ tests/
 └── test_session.py
 specs/
 ├── SPEC-interactive.md             # Interactive mode design spec
-└── SPEC-ask-user-tool.md           # `ask_user` elicitation tool design spec
+├── SPEC-ask-user-tool.md           # `ask_user` elicitation tool design spec
+├── SPEC-activity-signals.md        # Activity-signal design spec
+└── SPEC-workdir-boundary.md        # Working-directory boundary design spec
 ```
 
 ## Development Conventions
@@ -143,6 +147,7 @@ Settings load from environment variables with defaults defined in `filament/conf
 - `FILAMENT_ROSIE_MODEL` — model name to request from Rosie
 - `FILAMENT_ANTHROPIC_API_KEY` — Anthropic API key
 - `FILAMENT_ANTHROPIC_MODEL` — Anthropic model name; defaults to a current Sonnet variant
+- `FILAMENT_WORKDIR` — directory the file and shell tools are confined to; defaults to the directory Filament is launched from
 
 The CLI accepts `--backend rosie|anthropic` as an override. Faculty running Filament against different Rosie partitions or different Anthropic models change settings via environment, never via code edits.
 
@@ -152,4 +157,5 @@ The CLI accepts `--backend rosie|anthropic` as an override. Faculty running Fila
 - @specs/SPEC-interactive.md — Interactive mode design spec; read this before touching interactive-mode code
 - @specs/SPEC-ask-user-tool.md — `ask_user` elicitation-tool design spec; read this before implementing the agent-driven Q&A pattern
 - @specs/SPEC-activity-signals.md — Activity-signal design spec; read this before adding progress output to interactive mode
+- @specs/SPEC-workdir-boundary.md — Working-directory boundary design spec; read this before touching the file or shell tools
 - `tests/` — The behavioral contract; if in doubt, read the tests
