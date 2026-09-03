@@ -523,7 +523,7 @@ provider-specific error shapes.
 
 ## Issue 16 — The model's text is dropped when a turn also carries tool calls
 
-**Status:** Open
+**Status:** Done (commit ef339de)
 **Severity:** Design weakness (medium)
 **Location:** `filament/types.py:53`, `filament/model_clients/anthropic.py:143`, `filament/model_clients/rosie.py:95`
 
@@ -560,7 +560,7 @@ unchanged. The transcript's `model_response` event carries `text` instead of
 
 ## Issue 17 — Output cut off at the token limit is indistinguishable from a complete answer
 
-**Status:** Open
+**Status:** Done (commit f4643c3)
 **Severity:** Bug (medium)
 **Location:** `filament/model_clients/anthropic.py:128`, `filament/model_clients/rosie.py:91`, `filament/agent.py`
 
