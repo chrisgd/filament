@@ -468,7 +468,7 @@ trimmed; LF-only input is unaffected.
 
 ## Issue 14 — Malformed tool-call JSON from the backend escapes as a traceback
 
-**Status:** Open
+**Status:** Done (commit 5ff3183)
 **Severity:** Bug (medium)
 **Location:** `filament/model_clients/rosie.py:100`, `filament/cli.py:76`, `filament/interactive.py:170`
 
@@ -498,7 +498,7 @@ The `ModelClient` Protocol's signature is unchanged.
 
 ## Issue 15 — HTTP status errors discard the backend's explanation
 
-**Status:** Open
+**Status:** Done (commit 274bdf5)
 **Severity:** UX (low)
 **Location:** `filament/cli.py:76`, `filament/interactive.py:170`
 
