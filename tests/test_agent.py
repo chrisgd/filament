@@ -10,33 +10,9 @@ import json
 
 from filament.agent import MAX_ITERATIONS, Conversation, run_agent
 from filament.session import Session
-from filament.tools.base import Registry, Tool
-from filament.types import Message, Response, ToolCall
-
-
-class FakeClient:
-    """A ModelClient that replays a scripted list of Responses."""
-
-    def __init__(self, scripted: list[Response]) -> None:
-        self._scripted = list(scripted)
-        self.calls: list[list[Message]] = []
-
-    def complete(self, messages: list[Message], tools: list[Tool]) -> Response:
-        self.calls.append(list(messages))
-        return self._scripted.pop(0)
-
-
-def _registry_with(name: str, handler) -> Registry:
-    registry = Registry()
-    registry.register(
-        Tool(
-            name=name,
-            description="test tool",
-            parameters={"type": "object", "properties": {}},
-            handler=handler,
-        )
-    )
-    return registry
+from filament.tools.base import Registry
+from filament.types import Response, ToolCall
+from tests.fakes import FakeClient, registry_with
 
 
 def test_returns_text_without_tool_calls(tmp_path) -> None:
@@ -71,7 +47,7 @@ def test_dispatches_tool_call_then_returns_final(tmp_path) -> None:
             Response(text="finished"),
         ]
     )
-    registry = _registry_with("ping", lambda args: "pong")
+    registry = registry_with("ping", lambda args: "pong")
     with Session(tmp_path / "s.jsonl") as session:
         result = run_agent("ping it", client, registry, session, "fake")
     assert result == "finished"
@@ -94,7 +70,7 @@ def test_tool_failure_is_fed_back_as_text(tmp_path) -> None:
             Response(text="recovered"),
         ]
     )
-    registry = _registry_with("bad", boom)
+    registry = registry_with("bad", boom)
     with Session(tmp_path / "s.jsonl") as session:
         result = run_agent("try it", client, registry, session, "fake")
     assert result == "recovered"
@@ -151,7 +127,7 @@ def test_interstitial_text_is_kept_on_the_assistant_turn(tmp_path) -> None:
             Response(text="done"),
         ]
     )
-    registry = _registry_with("ping", lambda args: "pong")
+    registry = registry_with("ping", lambda args: "pong")
     with Session(path) as session:
         run_agent("ping", client, registry, session, "fake")
     assistant_turn = client.calls[1][-2]
@@ -173,7 +149,7 @@ def test_iteration_cap_stops_the_loop(tmp_path) -> None:
         for _ in range(MAX_ITERATIONS + 5)
     ]
     client = FakeClient(looping)
-    registry = _registry_with("ping", lambda args: "pong")
+    registry = registry_with("ping", lambda args: "pong")
     with Session(tmp_path / "s.jsonl") as session:
         result = run_agent("loop forever", client, registry, session, "fake")
     assert "limit" in result
@@ -190,7 +166,7 @@ def test_transcript_records_every_event(tmp_path) -> None:
             Response(text="done"),
         ]
     )
-    registry = _registry_with("ping", lambda args: "pong")
+    registry = registry_with("ping", lambda args: "pong")
     with Session(path) as session:
         run_agent("ping", client, registry, session, "rosie")
     events = [
@@ -294,7 +270,7 @@ def test_conversation_appends_assistant_on_iteration_cap(tmp_path) -> None:
         for i in range(MAX_ITERATIONS)
     ]
     client = FakeClient(looping + [Response(text="finally")])
-    registry = _registry_with("ping", lambda args: "pong")
+    registry = registry_with("ping", lambda args: "pong")
     with Session(tmp_path / "s.jsonl") as session:
         conversation = Conversation(client, registry, session, "fake")
         first = conversation.send("loop forever")
@@ -341,7 +317,7 @@ def test_reporter_fires_at_each_loop_transition(tmp_path) -> None:
             Response(text="done"),
         ]
     )
-    registry = _registry_with("ping", lambda args: "pong")
+    registry = registry_with("ping", lambda args: "pong")
     reporter = RecordingReporter()
     with Session(tmp_path / "s.jsonl") as session:
         Conversation(
@@ -369,7 +345,7 @@ def test_reporter_receives_error_string_for_failed_tools(tmp_path) -> None:
             Response(text="ok"),
         ]
     )
-    registry = _registry_with("bad", boom)
+    registry = registry_with("bad", boom)
     reporter = RecordingReporter()
     with Session(tmp_path / "s.jsonl") as session:
         Conversation(
@@ -402,7 +378,7 @@ def test_run_agent_oneshot_emits_no_activity_signals(tmp_path, capsys) -> None:
             Response(text="finished"),
         ]
     )
-    registry = _registry_with("ping", lambda args: "pong")
+    registry = registry_with("ping", lambda args: "pong")
     with Session(tmp_path / "s.jsonl") as session:
         run_agent("ping", client, registry, session, "fake")
     captured = capsys.readouterr()
@@ -461,7 +437,7 @@ def test_truncated_turn_is_never_dispatched(tmp_path) -> None:
             )
         ]
     )
-    registry = _registry_with("ping", lambda args: dispatched.append(args) or "pong")
+    registry = registry_with("ping", lambda args: dispatched.append(args) or "pong")
     with Session(tmp_path / "s.jsonl") as session:
         result = run_agent("ping", client, registry, session, "fake")
     assert dispatched == []
