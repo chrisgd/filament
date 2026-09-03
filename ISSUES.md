@@ -466,6 +466,61 @@ trimmed; LF-only input is unaffected.
 
 ---
 
+## Issue 14 — Malformed tool-call JSON from the backend escapes as a traceback
+
+**Status:** Open
+**Severity:** Bug (medium)
+**Location:** `filament/model_clients/rosie.py:100`, `filament/cli.py:76`, `filament/interactive.py:170`
+
+### Problem
+`rosie.py` parses each tool call's `arguments` string with `json.loads`.
+Open-weights models under vLLM emit truncated or invalid argument JSON often
+enough to matter. The resulting `JSONDecodeError` is not an `httpx.HTTPError`,
+so neither the one-shot CLI handler nor the interactive read-loop catches it:
+one-shot exits with a traceback, and an interactive session dies mid-turn,
+taking its conversation with it.
+
+### Fix
+Add a Filament-level `ModelResponseError` in `filament/model_clients/base.py`,
+raised by a client when the backend's reply cannot be translated into internal
+types. Raise it from the Rosie client on malformed or non-object tool-call
+arguments. Catch it alongside `httpx.HTTPError` in `cli.py` and
+`interactive.py` so it renders as the same `error: <Type>: <message>` line.
+The `ModelClient` Protocol's signature is unchanged.
+
+### Acceptance criteria
+- Malformed tool-call JSON produces `error: ModelResponseError: ...` and exit
+  code 1 in one-shot mode; in interactive mode the loop continues.
+- Offline tests in `tests/test_model_clients.py`, `tests/test_cli.py`, and
+  `tests/test_interactive.py`.
+
+---
+
+## Issue 15 — HTTP status errors discard the backend's explanation
+
+**Status:** Open
+**Severity:** UX (low)
+**Location:** `filament/cli.py:76`, `filament/interactive.py:170`
+
+### Problem
+Both clients call `reply.raise_for_status()`. The resulting `HTTPStatusError`
+message carries only the status code and URL (`Client error '400 Bad Request'
+for url ...`). The response body, where both Anthropic and vLLM put the actual
+reason (invalid model, malformed request, exhausted credit), is dropped. That
+is the one line a faculty member debugging a backend needs.
+
+### Fix
+At both catch sites, when the exception is an `httpx.HTTPStatusError`, also
+print the response body to stderr. Print the raw text; do not parse
+provider-specific error shapes.
+
+### Acceptance criteria
+- A non-2xx reply prints the body after the `error:` line in both modes.
+- Transport errors (no response) are unchanged.
+- Offline tests in `tests/test_cli.py` and `tests/test_interactive.py`.
+
+---
+
 ## Resolved / Not an issue
 
 ### Explanatory comments in `cli.py` `main()` — INTENTIONAL, no action
