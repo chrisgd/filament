@@ -1,16 +1,16 @@
-"""The `write_file` tool: write text to a file, creating parent directories."""
+"""The `write_file` tool: write text to a file, creating parent directories.
+
+Paths are confined to the working directory; see `workdir.py`. That is the
+only guard. Inside the boundary the tool overwrites whatever it is pointed
+at, so the boundary is what makes it safe to hand to a student.
+"""
 
 from __future__ import annotations
 
-import os
-
 from .base import Tool
+from .workdir import resolve_within
 
-# write a file with the given content, but note that this
-# could potentially write to any path the agent has access to, 
-# so for example, your entire home directory. Should be limited
-# to specific directories it can act in and not allowed to 
-# arbitrarily write elsewhere in the system for safety.
+
 def _write_file(arguments: dict[str, object]) -> str:
     path = arguments["path"]
     content = arguments["content"]
@@ -18,19 +18,18 @@ def _write_file(arguments: dict[str, object]) -> str:
         raise ValueError("write_file: 'path' must be a string")
     if not isinstance(content, str):
         raise ValueError("write_file: 'content' must be a string")
-    parent = os.path.dirname(path)
-    if parent:
-        os.makedirs(parent, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as handle:
-        handle.write(content)
+    target = resolve_within(path, "write_file")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(content, encoding="utf-8")
     return f"wrote {len(content)} characters to {path}"
 
 
 write_file_tool = Tool(
     name="write_file",
     description=(
-        "Write text content to a file, creating parent directories as needed. "
-        "Overwrites the file if it already exists."
+        "Write text content to a file in the working directory, creating "
+        "parent directories as needed. Overwrites the file if it already "
+        "exists. Paths outside the working directory are refused."
     ),
     parameters={
         "type": "object",

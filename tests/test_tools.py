@@ -7,12 +7,26 @@ from __future__ import annotations
 
 import io
 import sys
+from pathlib import Path
 
 import pytest
 
 from filament.tools import Tool, build_registry
 from filament.tools import ask_user as ask_user_module
+from filament.tools import workdir
 from filament.tools.base import Registry
+
+
+@pytest.fixture(autouse=True)
+def workdir_root(tmp_path):
+    """Confine every tool test to its own `tmp_path`.
+
+    `set_root` mutates module state, so restore the default (the process
+    cwd) afterwards rather than leak one test's root into the next.
+    """
+    workdir.set_root(tmp_path)
+    yield tmp_path
+    workdir.set_root(Path.cwd())
 
 
 # --- Registry --------------------------------------------------------------
@@ -223,7 +237,7 @@ def test_ask_user_eof_through_loop_surfaces_as_tool_error(
                     ToolCall(id="c1", name="ask_user", arguments={"question": "x?"})
                 ]
             ),
-            Response(final_text="couldn't get an answer"),
+            Response(text="couldn't get an answer"),
         ]
     )
     registry = build_registry()
@@ -234,3 +248,97 @@ def test_ask_user_eof_through_loop_surfaces_as_tool_error(
     tool_message = second_call_messages[-1]
     assert tool_message.role == "tool"
     assert tool_message.content.startswith("error: EOFError: ")
+
+
+# --- workdir ---------------------------------------------------------------
+
+
+def test_workdir_relative_path_resolves_under_root(tmp_path) -> None:
+    resolved = workdir.resolve_within("notes.txt", "t")
+    assert resolved == tmp_path.resolve() / "notes.txt"
+
+
+def test_workdir_absolute_path_inside_root_is_accepted(tmp_path) -> None:
+    inside = tmp_path / "sub" / "f.txt"
+    assert workdir.resolve_within(str(inside), "t") == inside.resolve()
+
+
+def test_workdir_absolute_path_outside_root_is_refused() -> None:
+    with pytest.raises(PermissionError, match="escapes the working directory"):
+        workdir.resolve_within("/etc/passwd", "t")
+
+
+def test_workdir_dotdot_traversal_is_refused() -> None:
+    with pytest.raises(PermissionError):
+        workdir.resolve_within("../outside.txt", "t")
+
+
+def test_workdir_symlink_pointing_outside_is_refused(
+    tmp_path, tmp_path_factory
+) -> None:
+    outside = tmp_path_factory.mktemp("outside")
+    (tmp_path / "link").symlink_to(outside)
+    with pytest.raises(PermissionError):
+        workdir.resolve_within("link/secret.txt", "t")
+
+
+def test_workdir_tilde_is_expanded_before_check(
+    tmp_path_factory, monkeypatch
+) -> None:
+    # With HOME outside the root, ~/x must be refused, not created as a
+    # literal "~" directory under the root.
+    monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))
+    with pytest.raises(PermissionError, match="escapes"):
+        workdir.resolve_within("~/.ssh/config", "t")
+
+
+def test_workdir_set_root_rejects_missing_directory(tmp_path) -> None:
+    with pytest.raises(ValueError, match="does not exist"):
+        workdir.set_root(tmp_path / "nope")
+
+
+def test_workdir_root_defaults_to_cwd(monkeypatch) -> None:
+    monkeypatch.setattr(workdir, "_root", None)
+    assert workdir.root() == Path.cwd().resolve()
+
+
+# --- working-directory boundary through the tools --------------------------
+
+
+def test_read_file_outside_working_directory_is_refused(
+    tmp_path_factory,
+) -> None:
+    outside = tmp_path_factory.mktemp("outside") / "secret.txt"
+    outside.write_text("nope", encoding="utf-8")
+    registry = build_registry()
+    with pytest.raises(PermissionError, match="escapes the working directory"):
+        registry.invoke("read_file", {"path": str(outside)})
+
+
+def test_read_file_relative_path_resolves_from_root_not_cwd(tmp_path) -> None:
+    # The root is tmp_path (autouse fixture); the process cwd is elsewhere.
+    (tmp_path / "hello.txt").write_text("from root", encoding="utf-8")
+    registry = build_registry()
+    assert registry.invoke("read_file", {"path": "hello.txt"}) == "from root"
+
+
+def test_write_file_outside_working_directory_is_refused(
+    tmp_path_factory,
+) -> None:
+    outside = tmp_path_factory.mktemp("outside") / "evil.txt"
+    registry = build_registry()
+    with pytest.raises(PermissionError):
+        registry.invoke("write_file", {"path": str(outside), "content": "x"})
+    assert not outside.exists()
+
+
+def test_write_file_relative_path_lands_under_root(tmp_path) -> None:
+    registry = build_registry()
+    registry.invoke("write_file", {"path": "out/notes.txt", "content": "hi"})
+    assert (tmp_path / "out" / "notes.txt").read_text(encoding="utf-8") == "hi"
+
+
+def test_run_shell_runs_in_working_directory(tmp_path) -> None:
+    registry = build_registry()
+    result = registry.invoke("run_shell", {"command": "pwd"})
+    assert str(tmp_path.resolve()) in result

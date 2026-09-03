@@ -17,7 +17,7 @@ def test_session_writes_one_json_object_per_event(tmp_path) -> None:
     path = tmp_path / "s.jsonl"
     with Session(path) as session:
         session.log_model_call("rosie", [Message(role="user", content="hi")])
-        session.log_model_response(Response(final_text="done"))
+        session.log_model_response(Response(text="done"))
     events = _read_events(path)
     assert [e["event"] for e in events] == ["model_call", "model_response"]
     assert all("timestamp" in e for e in events)

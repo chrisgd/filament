@@ -40,6 +40,9 @@ filament
 
 Session transcripts are written to `./filament-sessions/{timestamp}.jsonl`.
 
+The file and shell tools are confined to the directory you launch `filament`
+from. Set `FILAMENT_WORKDIR` to point them somewhere else.
+
 ## Tests
 
 ```

@@ -115,29 +115,46 @@ class Conversation:
                 self._reporter.model_call_end()
             self._session.log_model_response(response)
 
-            if response.final_text is not None:
-                # Record the assistant's final answer in conversation history
-                # so the next .send() sees it. For one-shot use this is
-                # invisible — the messages list is discarded on return.
-                self.messages.append(
-                    Message(role="assistant", content=response.final_text)
+            if response.truncated:
+                # The backend cut the output off at its token limit, so what
+                # came back is incomplete. Keep any partial text so the user
+                # sees it, but stop rather than act on it.
+                notice = "Stopped: model output was cut off at the token limit."
+                stopped = (
+                    f"{response.text}\n\n{notice}" if response.text else notice
                 )
-                return response.final_text
+                self.messages.append(
+                    Message(role="assistant", content=stopped)
+                )
+                return stopped
+
+            if not response.tool_calls and response.text is not None:
+                # Final answer. Record it in conversation history so the
+                # next .send() sees it. For one-shot use this is invisible —
+                # the messages list is discarded on return.
+                self.messages.append(
+                    Message(role="assistant", content=response.text)
+                )
+                return response.text
 
             if not response.tool_calls:
                 # Empty output: record the sentinel as the assistant turn so
                 # the conversation history stays coherent for a follow-up
-                # .send(). Symmetric with the final_text path above.
+                # .send(). Symmetric with the final-answer path above.
                 stopped = "Stopped: model returned empty output."
                 self.messages.append(
                     Message(role="assistant", content=stopped)
                 )
                 return stopped
 
+            # Tool calls. Record the assistant turn with any text the model
+            # said alongside its calls ("let me read the README first") so
+            # the transcript and the replayed conversation keep it, then
+            # dispatch each call and append its result.
             self.messages.append(
                 Message(
                     role="assistant",
-                    content=None,
+                    content=response.text,
                     tool_calls=response.tool_calls,
                 )
             )

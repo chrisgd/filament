@@ -5,6 +5,7 @@ from __future__ import annotations
 import subprocess
 
 from .base import Tool
+from .workdir import root
 
 _TIMEOUT_SECONDS = 30
 
@@ -13,6 +14,10 @@ _TIMEOUT_SECONDS = 30
 # but useful for a starting point. Instead you'd want
 # to build more specific tools that only allow certain
 # safe or protected operations.
+#
+# The command runs with the working directory as its cwd, so relative
+# paths land inside the boundary. That is not a sandbox: a command can
+# still name any absolute path. See @specs/SPEC-workdir-boundary.md.
 def _run_shell(arguments: dict[str, object]) -> str:
     command = arguments["command"]
     if not isinstance(command, str):
@@ -24,6 +29,7 @@ def _run_shell(arguments: dict[str, object]) -> str:
             capture_output=True,
             text=True,
             timeout=_TIMEOUT_SECONDS,
+            cwd=root(),
         )
     except subprocess.TimeoutExpired:
         raise TimeoutError(
@@ -39,8 +45,9 @@ def _run_shell(arguments: dict[str, object]) -> str:
 run_shell_tool = Tool(
     name="run_shell",
     description=(
-        "Run a shell command via subprocess with a 30-second timeout. Returns "
-        "the exit code together with combined stdout and stderr."
+        "Run a shell command via subprocess with a 30-second timeout. The "
+        "command runs in the working directory; keep its effects inside it. "
+        "Returns the exit code together with stdout and stderr."
     ),
     parameters={
         "type": "object",

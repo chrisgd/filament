@@ -22,6 +22,7 @@ class Config:
     rosie_model: str
     anthropic_api_key: str
     anthropic_model: str
+    workdir: str
 
 
 def load_config() -> Config:
@@ -34,4 +35,5 @@ def load_config() -> Config:
         anthropic_model=os.environ.get(
             "FILAMENT_ANTHROPIC_MODEL", DEFAULT_ANTHROPIC_MODEL
         ),
+        workdir=os.environ.get("FILAMENT_WORKDIR") or os.getcwd(),
     )

@@ -41,18 +41,18 @@ class Message:
 class Response:
     """What a model client returns from `complete`.
 
-    A response carries `final_text` (the model is done) or `tool_calls` (the
-    model wants to call tools), never both. It may carry neither: that signals
-    the model produced genuinely empty output, which the agent loop surfaces
-    explicitly rather than mistaking for a final answer.
+    `text` is what the model said this turn; `tool_calls` is what it asked
+    the harness to do. Both may be present: models often say "let me read
+    the file first" alongside the call, and both wire formats carry that. A
+    turn with tool calls is not final, whatever its text. A turn with neither
+    is genuinely empty output, which the agent loop surfaces explicitly
+    rather than mistaking for an answer.
+
+    `truncated` means the backend cut the output off at its token limit, so
+    whatever came back is incomplete. Clients carry only the text of such a
+    turn, and the loop stops rather than act on it.
     """
 
-    final_text: str | None = None
+    text: str | None = None
     tool_calls: list[ToolCall] = field(default_factory=list)
-
-    def __post_init__(self) -> None:
-        if self.final_text is not None and self.tool_calls:
-            raise ValueError(
-                "Response carries both final_text and tool_calls; a response "
-                "is final text or tool calls, never both."
-            )
+    truncated: bool = False

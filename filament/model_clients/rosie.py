@@ -90,16 +90,23 @@ def _to_wire_tool(tool: Tool) -> dict[str, object]:
 
 def _from_wire_response(payload: dict[str, Any]) -> Response:
     """Extract a Response from an OpenAI chat-completions payload."""
-    message = payload["choices"][0]["message"]
-    raw_calls = message.get("tool_calls")
-    if raw_calls:
-        return Response(
-            tool_calls=[_from_wire_tool_call(call) for call in raw_calls]
-        )
-    content = message.get("content")
-    if content:
-        return Response(final_text=content)
-    return Response()
+    choice = payload["choices"][0]
+    message = choice["message"]
+    text = message.get("content") or None
+    if choice.get("finish_reason") == "length":
+        # Cut off at the token limit. Tool calls in a truncated reply may
+        # have been cut mid-JSON; don't parse them, carry only the text and
+        # let the loop stop.
+        return Response(text=text, truncated=True)
+    # Content and tool_calls may both be present ("let me read the file"
+    # followed by the call); both are kept.
+    return Response(
+        text=text,
+        tool_calls=[
+            _from_wire_tool_call(call)
+            for call in message.get("tool_calls") or []
+        ],
+    )
 
 
 def _from_wire_tool_call(call: dict[str, Any]) -> ToolCall:
