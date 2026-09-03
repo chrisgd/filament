@@ -47,7 +47,12 @@ class Response:
     turn with tool calls is not final, whatever its text. A turn with neither
     is genuinely empty output, which the agent loop surfaces explicitly
     rather than mistaking for an answer.
+
+    `truncated` means the backend cut the output off at its token limit, so
+    whatever came back is incomplete. Clients carry only the text of such a
+    turn, and the loop stops rather than act on it.
     """
 
     text: str | None = None
     tool_calls: list[ToolCall] = field(default_factory=list)
+    truncated: bool = False

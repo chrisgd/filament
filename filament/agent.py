@@ -115,6 +115,19 @@ class Conversation:
                 self._reporter.model_call_end()
             self._session.log_model_response(response)
 
+            if response.truncated:
+                # The backend cut the output off at its token limit, so what
+                # came back is incomplete. Keep any partial text so the user
+                # sees it, but stop rather than act on it.
+                notice = "Stopped: model output was cut off at the token limit."
+                stopped = (
+                    f"{response.text}\n\n{notice}" if response.text else notice
+                )
+                self.messages.append(
+                    Message(role="assistant", content=stopped)
+                )
+                return stopped
+
             if not response.tool_calls and response.text is not None:
                 # Final answer. Record it in conversation history so the
                 # next .send() sees it. For one-shot use this is invisible —

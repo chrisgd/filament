@@ -31,7 +31,7 @@ Defined in `filament/types.py`:
 
 - **`Message`** — One turn in conversation history. Has `role`, `content`, `tool_calls`, `tool_call_id`, `name`.
 - **`ToolCall`** — A request from the model to invoke a tool. Has `id`, `name`, `arguments` (already-parsed dict).
-- **`Response`** — A model client's return value. Has `text` (what the model said) and `tool_calls` (what it asked for); both may be present. A turn with tool calls is not final, whatever its text; a turn with neither is empty output.
+- **`Response`** — A model client's return value. Has `text` (what the model said) and `tool_calls` (what it asked for); both may be present. A turn with tool calls is not final, whatever its text; a turn with neither is empty output. `truncated` marks output the backend cut off at its token limit; the loop stops rather than act on it.
 
 If you find yourself reaching for a raw API response shape outside of a model client, stop and route through the internal types instead.
 

@@ -423,3 +423,46 @@ def test_conversation_messages_grow_across_turns(tmp_path) -> None:
         assert len(conversation.messages) == 3  # +user, +assistant
         conversation.send("two")
         assert len(conversation.messages) == 5  # +user, +assistant
+
+
+def test_truncated_output_stops_with_partial_text_and_notice(tmp_path) -> None:
+    # Issue 17: a reply cut off at the token limit is not a finished answer.
+    # The partial text is kept so the user sees it; the notice says why it
+    # stopped; the assistant turn is recorded so a follow-up stays coherent.
+    path = tmp_path / "s.jsonl"
+    client = FakeClient(
+        [Response(text="Here is the fi", truncated=True), Response(text="ok")]
+    )
+    with Session(path) as session:
+        conversation = Conversation(client, Registry(), session, "fake")
+        result = conversation.send("explain")
+        assert result.startswith("Here is the fi")
+        assert "cut off at the token limit" in result
+        assert conversation.messages[-1].role == "assistant"
+        assert conversation.messages[-1].content == result
+        conversation.send("go on")
+    assert [m.role for m in client.calls[1]] == ["system", "user", "assistant", "user"]
+    events = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert events[1]["response"]["truncated"] is True
+
+
+def test_truncated_turn_is_never_dispatched(tmp_path) -> None:
+    # Even if a client hands over tool calls on a truncated turn, the loop
+    # must not act on them.
+    dispatched: list[dict] = []
+    client = FakeClient(
+        [
+            Response(
+                tool_calls=[ToolCall(id="c1", name="ping", arguments={})],
+                truncated=True,
+            )
+        ]
+    )
+    registry = _registry_with("ping", lambda args: dispatched.append(args) or "pong")
+    with Session(tmp_path / "s.jsonl") as session:
+        result = run_agent("ping", client, registry, session, "fake")
+    assert dispatched == []
+    assert result == "Stopped: model output was cut off at the token limit."

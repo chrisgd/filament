@@ -176,3 +176,50 @@ def test_rosie_keeps_content_alongside_tool_calls() -> None:
     response = _rosie_from_wire_response(payload)
     assert response.text == "Let me read it."
     assert [call.name for call in response.tool_calls] == ["read_file"]
+
+
+def test_anthropic_max_tokens_marks_truncated_and_carries_only_text() -> None:
+    # Issue 17.
+    response = _anthropic_from_wire_response(
+        {
+            "content": [
+                {"type": "text", "text": "Here is the fi"},
+                {"type": "tool_use", "id": "t1", "name": "write_file", "input": {}},
+            ],
+            "stop_reason": "max_tokens",
+        }
+    )
+    assert response.truncated is True
+    assert response.text == "Here is the fi"
+    assert response.tool_calls == []
+
+
+def test_anthropic_end_turn_is_not_truncated() -> None:
+    response = _anthropic_from_wire_response(
+        {"content": [{"type": "text", "text": "done"}], "stop_reason": "end_turn"}
+    )
+    assert response.truncated is False
+    assert response.text == "done"
+
+
+def test_rosie_length_marks_truncated_without_parsing_tool_calls() -> None:
+    # A tool call cut mid-JSON would otherwise raise ModelResponseError; on a
+    # truncated reply the client skips parsing and carries only the text.
+    payload = _rosie_tool_call_payload('{"path": "README.md')
+    payload["choices"][0]["finish_reason"] = "length"
+    payload["choices"][0]["message"]["content"] = "Writing the file"
+    response = _rosie_from_wire_response(payload)
+    assert response.truncated is True
+    assert response.text == "Writing the file"
+    assert response.tool_calls == []
+
+
+def test_rosie_stop_is_not_truncated() -> None:
+    payload = {
+        "choices": [
+            {"finish_reason": "stop", "message": {"content": "done"}}
+        ]
+    }
+    response = _rosie_from_wire_response(payload)
+    assert response.truncated is False
+    assert response.text == "done"
