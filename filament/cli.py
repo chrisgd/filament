@@ -17,7 +17,7 @@ from .config import load_config
 from .interactive import run_interactive
 from .model_clients import ModelResponseError, build_client
 from .session import new_session
-from .tools import build_registry
+from .tools import build_registry, workdir
 
 # main entry point for filament agent
 def main(argv: list[str] | None = None) -> int:
@@ -46,6 +46,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         # create the client
         client = build_client(config)
+        # confine the file and shell tools to the working directory
+        # (see @specs/SPEC-workdir-boundary.md)
+        workdir.set_root(config.workdir)
     except ValueError as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2

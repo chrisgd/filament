@@ -91,6 +91,7 @@ def test_backend_flag_overrides_config(monkeypatch) -> None:
         rosie_model="",
         anthropic_api_key="key",
         anthropic_model="model",
+        workdir=".",
     )
     monkeypatch.setattr(cli, "load_config", lambda: base)
     seen: dict[str, str] = {}
@@ -174,3 +175,28 @@ def test_http_status_error_with_empty_body_prints_no_body_line(
     _stub_runtime(monkeypatch, run_agent=fail)
     cli.main(["do a task"])
     assert "response body" not in capsys.readouterr().err
+
+
+def test_missing_workdir_is_reported_as_configuration_error(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    monkeypatch.setenv("FILAMENT_WORKDIR", str(tmp_path / "nope"))
+    _stub_runtime(monkeypatch, run_agent=lambda *args: "unreachable")
+    code = cli.main(["do a task"])
+    assert code == 2
+    err = capsys.readouterr().err
+    assert "configuration error" in err
+    assert "working directory does not exist" in err
+
+
+def test_main_confines_tools_to_configured_workdir(
+    monkeypatch, tmp_path
+) -> None:
+    monkeypatch.setenv("FILAMENT_WORKDIR", str(tmp_path))
+    seen: dict[str, object] = {}
+    monkeypatch.setattr(
+        cli.workdir, "set_root", lambda path: seen.setdefault("root", path)
+    )
+    _stub_runtime(monkeypatch, run_agent=lambda *args: "done")
+    assert cli.main(["do a task"]) == 0
+    assert seen["root"] == str(tmp_path)
