@@ -13,7 +13,7 @@ from typing import Protocol
 from .model_clients.base import ModelClient
 from .session import Session
 from .tools.base import Registry
-from .types import Message
+from .types import Message, Response
 
 
 class TurnReporter(Protocol):
@@ -31,7 +31,7 @@ class TurnReporter(Protocol):
     """
 
     def model_call_start(self, iteration: int) -> None: ...
-    def model_call_end(self) -> None: ...
+    def model_call_end(self, response: Response) -> None: ...
     def tool_call(self, name: str, arguments: dict[str, object]) -> None: ...
     def tool_result(self, name: str, result: str) -> None: ...
 
@@ -112,7 +112,7 @@ class Conversation:
                 self._reporter.model_call_start(iteration + 1)
             response = self._client.complete(self.messages, tools)
             if self._reporter is not None:
-                self._reporter.model_call_end()
+                self._reporter.model_call_end(response)
             self._session.log_model_response(response)
 
             if response.truncated:

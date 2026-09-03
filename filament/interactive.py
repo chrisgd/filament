@@ -17,7 +17,7 @@ from .model_clients.base import ModelClient, ModelResponseError
 from .session import Session
 from .tools import ask_user as ask_user_module
 from .tools.base import Registry
-from .types import Message
+from .types import Message, Response
 
 _ARG_VALUE_MAX = 60
 _ARG_TRUNCATION_SUFFIX = "..."
@@ -40,10 +40,13 @@ class ConsoleReporter:
         # final text) is itself the signal that the call returned.
         print("[thinking...]", file=self._stream, flush=True)
 
-    def model_call_end(self) -> None:
-        # No-op: the following [tool] line or the final text already shows
-        # that the call returned. The hook exists so the Protocol is honored.
-        pass
+    def model_call_end(self, response: Response) -> None:
+        # Text the model said alongside its tool calls ("let me read the
+        # README first") is printed bare, like its final answer: bracketed
+        # lines are the harness, bare lines are the model. A final answer
+        # is not printed here; the read-loop prints it as the turn's result.
+        if response.tool_calls and response.text:
+            print(response.text, file=self._stream, flush=True)
 
     def tool_call(self, name: str, arguments: dict[str, object]) -> None:
         rendered = _format_args(arguments)
