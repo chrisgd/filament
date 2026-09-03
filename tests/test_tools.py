@@ -300,3 +300,45 @@ def test_workdir_set_root_rejects_missing_directory(tmp_path) -> None:
 def test_workdir_root_defaults_to_cwd(monkeypatch) -> None:
     monkeypatch.setattr(workdir, "_root", None)
     assert workdir.root() == Path.cwd().resolve()
+
+
+# --- working-directory boundary through the tools --------------------------
+
+
+def test_read_file_outside_working_directory_is_refused(
+    tmp_path_factory,
+) -> None:
+    outside = tmp_path_factory.mktemp("outside") / "secret.txt"
+    outside.write_text("nope", encoding="utf-8")
+    registry = build_registry()
+    with pytest.raises(PermissionError, match="escapes the working directory"):
+        registry.invoke("read_file", {"path": str(outside)})
+
+
+def test_read_file_relative_path_resolves_from_root_not_cwd(tmp_path) -> None:
+    # The root is tmp_path (autouse fixture); the process cwd is elsewhere.
+    (tmp_path / "hello.txt").write_text("from root", encoding="utf-8")
+    registry = build_registry()
+    assert registry.invoke("read_file", {"path": "hello.txt"}) == "from root"
+
+
+def test_write_file_outside_working_directory_is_refused(
+    tmp_path_factory,
+) -> None:
+    outside = tmp_path_factory.mktemp("outside") / "evil.txt"
+    registry = build_registry()
+    with pytest.raises(PermissionError):
+        registry.invoke("write_file", {"path": str(outside), "content": "x"})
+    assert not outside.exists()
+
+
+def test_write_file_relative_path_lands_under_root(tmp_path) -> None:
+    registry = build_registry()
+    registry.invoke("write_file", {"path": "out/notes.txt", "content": "hi"})
+    assert (tmp_path / "out" / "notes.txt").read_text(encoding="utf-8") == "hi"
+
+
+def test_run_shell_runs_in_working_directory(tmp_path) -> None:
+    registry = build_registry()
+    result = registry.invoke("run_shell", {"command": "pwd"})
+    assert str(tmp_path.resolve()) in result
