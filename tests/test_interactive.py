@@ -54,8 +54,8 @@ def _run(
 def test_two_turn_conversation_then_exit(tmp_path) -> None:
     client = FakeClient(
         [
-            Response(final_text="answer one"),
-            Response(final_text="answer two"),
+            Response(text="answer one"),
+            Response(text="answer two"),
         ]
     )
     code, out, _ = _run(
@@ -79,7 +79,7 @@ def test_eof_exits_cleanly_without_model_call(tmp_path) -> None:
 
 
 def test_empty_lines_reprompt_without_model_call(tmp_path) -> None:
-    client = FakeClient([Response(final_text="ok")])
+    client = FakeClient([Response(text="ok")])
     code, _, _ = _run(
         tmp_path, client, "\n   \nactual task\n/exit\n"
     )
@@ -89,7 +89,7 @@ def test_empty_lines_reprompt_without_model_call(tmp_path) -> None:
 
 def test_reset_clears_history(tmp_path) -> None:
     client = FakeClient(
-        [Response(final_text="ans one"), Response(final_text="ans two")]
+        [Response(text="ans one"), Response(text="ans two")]
     )
     _, out, _ = _run(
         tmp_path, client, "first\n/reset\nsecond\n/exit\n"
@@ -103,7 +103,7 @@ def test_reset_clears_history(tmp_path) -> None:
 
 
 def test_messages_command_prints_breakdown(tmp_path) -> None:
-    client = FakeClient([Response(final_text="ok")])
+    client = FakeClient([Response(text="ok")])
     _, out, _ = _run(tmp_path, client, "a task\n/messages\n/exit\n")
     # After one turn: system(1) + user(1) + assistant(1) = 3 messages.
     assert "3 messages" in out
@@ -122,7 +122,7 @@ def test_help_command_prints_command_list(tmp_path) -> None:
 
 
 def test_unknown_slash_command_is_treated_as_task(tmp_path) -> None:
-    client = FakeClient([Response(final_text="examined the file")])
+    client = FakeClient([Response(text="examined the file")])
     _, _, _ = _run(
         tmp_path, client, "/etc/hosts has a typo\n/exit\n"
     )
@@ -136,7 +136,7 @@ def test_crlf_slash_commands_are_recognized(tmp_path) -> None:
     # Issue 13: piped input with CRLF line endings (e.g. from a Windows-edited
     # file or `printf "/exit\r\n"`) must still match the exact-command set.
     # Without the \r strip, /exit becomes /exit\r and is sent to the model.
-    client = FakeClient([Response(final_text="ok")])
+    client = FakeClient([Response(text="ok")])
     code, out, _ = _run(
         tmp_path, client, "first task\r\n/exit\r\n"
     )
@@ -160,7 +160,7 @@ class FailThenSucceed:
         self.call_count += 1
         if self.call_count == 1:
             raise self._error
-        return Response(final_text="recovered")
+        return Response(text="recovered")
 
 
 def test_httpx_error_inside_a_turn_does_not_kill_the_loop(tmp_path) -> None:
@@ -237,7 +237,7 @@ def test_interactive_emits_activity_signals_around_turn(tmp_path) -> None:
                     )
                 ]
             ),
-            Response(final_text="summary text"),
+            Response(text="summary text"),
         ]
     )
     registry = _registry_with("read_file", lambda args: "FILE CONTENT")
@@ -269,7 +269,7 @@ def test_interactive_renders_tool_error_with_error_type(tmp_path) -> None:
                     ToolCall(id="c1", name="bad", arguments={})
                 ]
             ),
-            Response(final_text="recovered"),
+            Response(text="recovered"),
         ]
     )
     registry = _registry_with("bad", boom)

@@ -140,9 +140,12 @@ def _from_wire_response(payload: dict[str, Any]) -> Response:
                     arguments=block["input"],
                 )
             )
-    if tool_calls:
-        return Response(tool_calls=tool_calls)
-    text = "".join(text_parts)
-    if text:
-        return Response(final_text=text)
-    return Response()
+    text = "".join(text_parts) or None
+    if payload.get("stop_reason") == "max_tokens":
+        # Cut off at the token limit. Tool calls in a truncated reply cannot
+        # be trusted to be complete; carry only the text and let the loop
+        # stop.
+        return Response(text=text, truncated=True)
+    # Text and tool_use blocks may both be present ("let me read the file"
+    # followed by the call); both are kept.
+    return Response(text=text, tool_calls=tool_calls)
