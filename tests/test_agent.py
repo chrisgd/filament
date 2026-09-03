@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from filament.agent import MAX_ITERATIONS, Conversation, run_agent
 from filament.session import Session
 from filament.tools.base import Registry, Tool
@@ -41,8 +39,8 @@ def _registry_with(name: str, handler) -> Registry:
     return registry
 
 
-def test_returns_final_text_without_tool_calls(tmp_path) -> None:
-    client = FakeClient([Response(final_text="all done")])
+def test_returns_text_without_tool_calls(tmp_path) -> None:
+    client = FakeClient([Response(text="all done")])
     with Session(tmp_path / "s.jsonl") as session:
         result = run_agent(
             "do nothing", client, Registry(), session, "fake"
@@ -52,7 +50,7 @@ def test_returns_final_text_without_tool_calls(tmp_path) -> None:
 
 
 def test_loop_emits_system_message_before_task(tmp_path) -> None:
-    client = FakeClient([Response(final_text="done")])
+    client = FakeClient([Response(text="done")])
     with Session(tmp_path / "s.jsonl") as session:
         run_agent("the task", client, Registry(), session, "fake")
     first_call = client.calls[0]
@@ -70,7 +68,7 @@ def test_dispatches_tool_call_then_returns_final(tmp_path) -> None:
                     ToolCall(id="c1", name="ping", arguments={})
                 ]
             ),
-            Response(final_text="finished"),
+            Response(text="finished"),
         ]
     )
     registry = _registry_with("ping", lambda args: "pong")
@@ -93,7 +91,7 @@ def test_tool_failure_is_fed_back_as_text(tmp_path) -> None:
             Response(
                 tool_calls=[ToolCall(id="c1", name="bad", arguments={})]
             ),
-            Response(final_text="recovered"),
+            Response(text="recovered"),
         ]
     )
     registry = _registry_with("bad", boom)
@@ -111,7 +109,7 @@ def test_unknown_tool_is_fed_back_as_text(tmp_path) -> None:
             Response(
                 tool_calls=[ToolCall(id="c1", name="ghost", arguments={})]
             ),
-            Response(final_text="ok"),
+            Response(text="ok"),
         ]
     )
     with Session(tmp_path / "s.jsonl") as session:
@@ -121,7 +119,7 @@ def test_unknown_tool_is_fed_back_as_text(tmp_path) -> None:
 
 
 def test_empty_model_output_stops_with_explicit_message(tmp_path) -> None:
-    # A turn with neither final_text nor tool_calls is genuinely empty output.
+    # A turn with neither text nor tool_calls is genuinely empty output.
     client = FakeClient([Response()])
     with Session(tmp_path / "s.jsonl") as session:
         result = run_agent("do nothing", client, Registry(), session, "fake")
@@ -129,12 +127,43 @@ def test_empty_model_output_stops_with_explicit_message(tmp_path) -> None:
     assert len(client.calls) == 1
 
 
-def test_response_rejects_both_fields() -> None:
-    with pytest.raises(ValueError):
-        Response(
-            final_text="done",
-            tool_calls=[ToolCall(id="c1", name="ping", arguments={})],
-        )
+def test_response_carries_text_alongside_tool_calls() -> None:
+    # Issue 16: both wire formats allow text with tool calls, and models use
+    # it ("let me read the file first"). The internal type must not drop it.
+    response = Response(
+        text="Let me look.",
+        tool_calls=[ToolCall(id="c1", name="ping", arguments={})],
+    )
+    assert response.text == "Let me look."
+    assert [call.name for call in response.tool_calls] == ["ping"]
+
+
+def test_interstitial_text_is_kept_on_the_assistant_turn(tmp_path) -> None:
+    # Issue 16: the text said alongside a tool call reaches the assistant
+    # message, the next model_call, and the transcript.
+    path = tmp_path / "s.jsonl"
+    client = FakeClient(
+        [
+            Response(
+                text="Let me ping first.",
+                tool_calls=[ToolCall(id="c1", name="ping", arguments={})],
+            ),
+            Response(text="done"),
+        ]
+    )
+    registry = _registry_with("ping", lambda args: "pong")
+    with Session(path) as session:
+        run_agent("ping", client, registry, session, "fake")
+    assistant_turn = client.calls[1][-2]
+    assert assistant_turn.role == "assistant"
+    assert assistant_turn.content == "Let me ping first."
+    assert [call.name for call in assistant_turn.tool_calls] == ["ping"]
+    events = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert events[1]["event"] == "model_response"
+    assert events[1]["response"]["text"] == "Let me ping first."
 
 
 def test_iteration_cap_stops_the_loop(tmp_path) -> None:
@@ -158,7 +187,7 @@ def test_transcript_records_every_event(tmp_path) -> None:
             Response(
                 tool_calls=[ToolCall(id="c1", name="ping", arguments={})]
             ),
-            Response(final_text="done"),
+            Response(text="done"),
         ]
     )
     registry = _registry_with("ping", lambda args: "pong")
@@ -183,8 +212,8 @@ def test_transcript_records_every_event(tmp_path) -> None:
 def test_conversation_accumulates_history_across_turns(tmp_path) -> None:
     client = FakeClient(
         [
-            Response(final_text="answer one"),
-            Response(final_text="answer two"),
+            Response(text="answer one"),
+            Response(text="answer two"),
         ]
     )
     with Session(tmp_path / "s.jsonl") as session:
@@ -206,8 +235,8 @@ def test_conversation_accumulates_history_across_turns(tmp_path) -> None:
 def test_conversation_reset_drops_history_and_starts_fresh(tmp_path) -> None:
     client = FakeClient(
         [
-            Response(final_text="answer one"),
-            Response(final_text="answer two"),
+            Response(text="answer one"),
+            Response(text="answer two"),
         ]
     )
     with Session(tmp_path / "s.jsonl") as session:
@@ -229,7 +258,7 @@ def test_conversation_reset_logs_event_to_transcript(tmp_path) -> None:
     import json as _json
 
     path = tmp_path / "s.jsonl"
-    client = FakeClient([Response(final_text="ok")])
+    client = FakeClient([Response(text="ok")])
     with Session(path) as session:
         conversation = Conversation(client, Registry(), session, "fake")
         conversation.send("task")
@@ -244,7 +273,7 @@ def test_conversation_reset_logs_event_to_transcript(tmp_path) -> None:
 def test_conversation_appends_assistant_on_empty_output(tmp_path) -> None:
     # Issue 12: an empty-output turn must still record an assistant message,
     # otherwise the next .send() produces [system, user, user] — malformed.
-    client = FakeClient([Response(), Response(final_text="recovered")])
+    client = FakeClient([Response(), Response(text="recovered")])
     with Session(tmp_path / "s.jsonl") as session:
         conversation = Conversation(client, Registry(), session, "fake")
         first = conversation.send("ask one")
@@ -264,7 +293,7 @@ def test_conversation_appends_assistant_on_iteration_cap(tmp_path) -> None:
         Response(tool_calls=[ToolCall(id=f"c{i}", name="ping", arguments={})])
         for i in range(MAX_ITERATIONS)
     ]
-    client = FakeClient(looping + [Response(final_text="finally")])
+    client = FakeClient(looping + [Response(text="finally")])
     registry = _registry_with("ping", lambda args: "pong")
     with Session(tmp_path / "s.jsonl") as session:
         conversation = Conversation(client, registry, session, "fake")
@@ -309,7 +338,7 @@ def test_reporter_fires_at_each_loop_transition(tmp_path) -> None:
                     ToolCall(id="c1", name="ping", arguments={"x": 1})
                 ]
             ),
-            Response(final_text="done"),
+            Response(text="done"),
         ]
     )
     registry = _registry_with("ping", lambda args: "pong")
@@ -337,7 +366,7 @@ def test_reporter_receives_error_string_for_failed_tools(tmp_path) -> None:
     client = FakeClient(
         [
             Response(tool_calls=[ToolCall(id="c1", name="bad", arguments={})]),
-            Response(final_text="ok"),
+            Response(text="ok"),
         ]
     )
     registry = _registry_with("bad", boom)
@@ -356,7 +385,7 @@ def test_omitting_reporter_keeps_loop_silent(tmp_path) -> None:
     # The default behavior (no reporter) must be byte-identical to today —
     # nothing constructs a reporter, nothing fires. This is the regression
     # guard for one-shot mode silence.
-    client = FakeClient([Response(final_text="done")])
+    client = FakeClient([Response(text="done")])
     with Session(tmp_path / "s.jsonl") as session:
         # No reporter kwarg passed; .send completes without exceptions.
         Conversation(client, Registry(), session, "fake").send("task")
@@ -370,7 +399,7 @@ def test_run_agent_oneshot_emits_no_activity_signals(tmp_path, capsys) -> None:
             Response(
                 tool_calls=[ToolCall(id="c1", name="ping", arguments={})]
             ),
-            Response(final_text="finished"),
+            Response(text="finished"),
         ]
     )
     registry = _registry_with("ping", lambda args: "pong")
@@ -385,7 +414,7 @@ def test_run_agent_oneshot_emits_no_activity_signals(tmp_path, capsys) -> None:
 
 def test_conversation_messages_grow_across_turns(tmp_path) -> None:
     client = FakeClient(
-        [Response(final_text="a"), Response(final_text="b")]
+        [Response(text="a"), Response(text="b")]
     )
     with Session(tmp_path / "s.jsonl") as session:
         conversation = Conversation(client, Registry(), session, "fake")

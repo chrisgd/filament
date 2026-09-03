@@ -237,7 +237,7 @@ def test_ask_user_eof_through_loop_surfaces_as_tool_error(
                     ToolCall(id="c1", name="ask_user", arguments={"question": "x?"})
                 ]
             ),
-            Response(final_text="couldn't get an answer"),
+            Response(text="couldn't get an answer"),
         ]
     )
     registry = build_registry()

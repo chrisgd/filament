@@ -91,15 +91,15 @@ def _to_wire_tool(tool: Tool) -> dict[str, object]:
 def _from_wire_response(payload: dict[str, Any]) -> Response:
     """Extract a Response from an OpenAI chat-completions payload."""
     message = payload["choices"][0]["message"]
-    raw_calls = message.get("tool_calls")
-    if raw_calls:
-        return Response(
-            tool_calls=[_from_wire_tool_call(call) for call in raw_calls]
-        )
-    content = message.get("content")
-    if content:
-        return Response(final_text=content)
-    return Response()
+    # Content and tool_calls may both be present ("let me read the file"
+    # followed by the call); both are kept.
+    return Response(
+        text=message.get("content") or None,
+        tool_calls=[
+            _from_wire_tool_call(call)
+            for call in message.get("tool_calls") or []
+        ],
+    )
 
 
 def _from_wire_tool_call(call: dict[str, Any]) -> ToolCall:
