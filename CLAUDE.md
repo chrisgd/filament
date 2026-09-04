@@ -29,9 +29,9 @@ The agent loop, tool registry, and session module operate on Filament's internal
 
 Defined in `filament/types.py`:
 
-- **`Message`** — One turn in conversation history. Has `role`, `content`, `tool_calls`, `tool_call_id`, `name`.
+- **`Message`** — One turn in conversation history. Has `role`, `content`, `tool_calls`, `tool_call_id`, `name`, and `provider_state`.
 - **`ToolCall`** — A request from the model to invoke a tool. Has `id`, `name`, `arguments` (already-parsed dict).
-- **`Response`** — A model client's return value. Has `text` (what the model said) and `tool_calls` (what it asked for); both may be present. A turn with tool calls is not final, whatever its text; a turn with neither is empty output. `truncated` marks output the backend cut off at its token limit; the loop stops rather than act on it.
+- **`Response`** — A model client's return value. Has `text` (what the model said) and `tool_calls` (what it asked for); both may be present. A turn with tool calls is not final, whatever its text; a turn with neither is empty output. `truncated` marks output the backend cut off at its token limit; the loop stops rather than act on it. `provider_state` is opaque backend state (today, Anthropic thinking blocks) that the loop copies onto the assistant message and never reads; only the client that produced it may interpret it. See @specs/SPEC-provider-state.md.
 
 If you find yourself reaching for a raw API response shape outside of a model client, stop and route through the internal types instead.
 
@@ -121,7 +121,7 @@ specs/
 ├── SPEC-ask-user-tool.md           # `ask_user` elicitation tool design spec
 ├── SPEC-activity-signals.md        # Activity-signal design spec
 ├── SPEC-workdir-boundary.md        # Working-directory boundary design spec
-└── SPEC-provider-state.md          # Provider-state replay (thinking blocks) design spec; proposed
+└── SPEC-provider-state.md          # Provider-state replay (thinking blocks) design spec
 ```
 
 ## Development Conventions
@@ -160,5 +160,5 @@ The CLI accepts `--backend rosie|anthropic` as an override. Faculty running Fila
 - @specs/SPEC-ask-user-tool.md — `ask_user` elicitation-tool design spec; read this before implementing the agent-driven Q&A pattern
 - @specs/SPEC-activity-signals.md — Activity-signal design spec; read this before adding progress output to interactive mode
 - @specs/SPEC-workdir-boundary.md — Working-directory boundary design spec; read this before touching the file or shell tools
-- @specs/SPEC-provider-state.md — Provider-state replay design spec (proposed, not implemented); read this before changing the Anthropic default model or adding thinking support
+- @specs/SPEC-provider-state.md — Provider-state replay design spec; read this before changing the Anthropic default model, touching the Anthropic client's replay path, or adding thinking support
 - `tests/` — The behavioral contract; if in doubt, read the tests
