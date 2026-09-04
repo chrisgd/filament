@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 
 from ..tools.base import Tool
-from ..types import Message, Response, ToolCall
+from ..types import Message, Response, Role, ToolCall
 
 _API_URL = "https://api.anthropic.com/v1/messages"
 _API_VERSION = "2023-06-01"
@@ -69,7 +69,7 @@ def _system_prompt(messages: list[Message]) -> str:
     instructions go in a dedicated top-level field. Lifting them here is
     exactly the wire-format difference this client exists to absorb.
     """
-    parts = [m.content for m in messages if m.role == "system" and m.content]
+    parts = [m.content for m in messages if m.role == Role.SYSTEM and m.content]
     return "\n\n".join(parts)
 
 
@@ -86,9 +86,9 @@ def _to_wire_messages(messages: list[Message]) -> list[dict[str, object]]:
     wire: list[dict[str, object]] = []
     pending_results: list[dict[str, object]] | None = None
     for message in messages:
-        if message.role == "system":
+        if message.role == Role.SYSTEM:
             continue
-        if message.role == "tool":
+        if message.role == Role.TOOL:
             block: dict[str, object] = {
                 "type": "tool_result",
                 "tool_use_id": message.tool_call_id,
@@ -102,7 +102,7 @@ def _to_wire_messages(messages: list[Message]) -> list[dict[str, object]]:
             continue
 
         pending_results = None
-        if message.role == "assistant":
+        if message.role == Role.ASSISTANT:
             wire.append(
                 {"role": "assistant", "content": _assistant_content(message)}
             )

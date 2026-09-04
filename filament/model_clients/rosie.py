@@ -13,7 +13,7 @@ from typing import Any
 import httpx
 
 from ..tools.base import Tool
-from ..types import Message, Response, ToolCall
+from ..types import Message, Response, Role, ToolCall
 from .base import ModelResponseError
 
 _TIMEOUT_SECONDS = 120.0
@@ -51,7 +51,7 @@ def _to_wire_message(message: Message) -> dict[str, object]:
 
     System messages need no special handling: the OpenAI chat format carries
     system instructions as a `system`-role entry in the `messages` array, so a
-    `role="system"` message passes through the generic path unchanged. (The
+    `Role.SYSTEM` message passes through the generic path unchanged. (The
     Anthropic client must instead lift them to a top-level `system` param.)
 
     `provider_state` is not read: Rosie has nothing to replay. Thinking Qwen
@@ -60,7 +60,7 @@ def _to_wire_message(message: Message) -> dict[str, object]:
     `_from_wire_response` never sets the field. See
     @specs/SPEC-provider-state.md.
     """
-    if message.role == "tool":
+    if message.role == Role.TOOL:
         return {
             "role": "tool",
             "tool_call_id": message.tool_call_id,

@@ -14,9 +14,16 @@ from dataclasses import dataclass
 class Tool:
     """A declarative tool definition.
 
-    `parameters` is a JSON Schema dict describing the handler's arguments.
-    `handler` takes a dict of those arguments and returns a string result.
-    Any side effects must be documented in `description`.
+    Attributes:
+        name: The identifier the model calls the tool by. Unique within a
+            `Registry`.
+        description: What the tool does, shown to the model. Any side
+            effects (files written, commands run) must be stated here.
+        parameters: A JSON Schema dict describing the handler's arguments.
+            Sent to the backend as the tool's input schema.
+        handler: The function that does the work. Takes the parsed
+            arguments as a dict and returns a string result. Raises on
+            failure; the loop feeds the error back to the model as text.
     """
 
     name: str

@@ -13,7 +13,7 @@ from typing import Protocol
 from .model_clients.base import ModelClient
 from .session import Session
 from .tools.base import Registry
-from .types import Message, Response
+from .types import Message, Response, Role
 
 
 class TurnReporter(Protocol):
@@ -87,7 +87,7 @@ class Conversation:
         self._backend = backend
         self._reporter = reporter
         self.messages: list[Message] = [
-            Message(role="system", content=SYSTEM_PROMPT),
+            Message(role=Role.SYSTEM, content=SYSTEM_PROMPT),
         ]
 
     def reset(self) -> None:
@@ -96,12 +96,12 @@ class Conversation:
         Records a `conversation_reset` event in the session so the transcript
         is honest about the boundary between the old and new conversation.
         """
-        self.messages = [Message(role="system", content=SYSTEM_PROMPT)]
+        self.messages = [Message(role=Role.SYSTEM, content=SYSTEM_PROMPT)]
         self._session.log_reset()
 
     def send(self, task: str) -> str:
         """Append the user task, run the loop, return the final text."""
-        self.messages.append(Message(role="user", content=f"Task: {task}"))
+        self.messages.append(Message(role=Role.USER, content=f"Task: {task}"))
         tools = self._registry.tools()
 
         for iteration in range(MAX_ITERATIONS):
@@ -124,7 +124,7 @@ class Conversation:
                     f"{response.text}\n\n{notice}" if response.text else notice
                 )
                 self.messages.append(
-                    Message(role="assistant", content=stopped)
+                    Message(role=Role.ASSISTANT, content=stopped)
                 )
                 return stopped
 
@@ -140,7 +140,7 @@ class Conversation:
                 # are the harness's, not the model's.
                 self.messages.append(
                     Message(
-                        role="assistant",
+                        role=Role.ASSISTANT,
                         content=response.text,
                         provider_state=response.provider_state,
                     )
@@ -153,7 +153,7 @@ class Conversation:
                 # .send(). Symmetric with the final-answer path above.
                 stopped = "Stopped: model returned empty output."
                 self.messages.append(
-                    Message(role="assistant", content=stopped)
+                    Message(role=Role.ASSISTANT, content=stopped)
                 )
                 return stopped
 
@@ -164,7 +164,7 @@ class Conversation:
             # each call and append its result.
             self.messages.append(
                 Message(
-                    role="assistant",
+                    role=Role.ASSISTANT,
                     content=response.text,
                     tool_calls=response.tool_calls,
                     provider_state=response.provider_state,
@@ -180,7 +180,7 @@ class Conversation:
                     self._reporter.tool_result(call.name, result)
                 self.messages.append(
                     Message(
-                        role="tool",
+                        role=Role.TOOL,
                         content=result,
                         tool_call_id=call.id,
                         name=call.name,
@@ -193,7 +193,7 @@ class Conversation:
             f"Stopped: reached the {MAX_ITERATIONS}-iteration limit without a "
             "final answer."
         )
-        self.messages.append(Message(role="assistant", content=stopped))
+        self.messages.append(Message(role=Role.ASSISTANT, content=stopped))
         return stopped
 
 

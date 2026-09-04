@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from filament.agent import MAX_ITERATIONS, Conversation, run_agent
 from filament.session import Session
 from filament.tools.base import Registry
-from filament.types import Response, ToolCall
+from filament.types import Message, Response, Role, ToolCall
 from tests.fakes import FakeClient, registry_with
 
 
@@ -30,9 +32,9 @@ def test_loop_emits_system_message_before_task(tmp_path) -> None:
     with Session(tmp_path / "s.jsonl") as session:
         run_agent("the task", client, Registry(), session, "fake")
     first_call = client.calls[0]
-    assert first_call[0].role == "system"
+    assert first_call[0].role == Role.SYSTEM
     assert first_call[0].content
-    assert first_call[1].role == "user"
+    assert first_call[1].role == Role.USER
     assert first_call[1].content == "Task: the task"
 
 
@@ -53,9 +55,9 @@ def test_dispatches_tool_call_then_returns_final(tmp_path) -> None:
     assert result == "finished"
     # Second model call should include the assistant + tool messages.
     second_call = client.calls[1]
-    assert second_call[-1].role == "tool"
+    assert second_call[-1].role == Role.TOOL
     assert second_call[-1].content == "pong"
-    assert second_call[-2].role == "assistant"
+    assert second_call[-2].role == Role.ASSISTANT
 
 
 def test_tool_failure_is_fed_back_as_text(tmp_path) -> None:
@@ -75,7 +77,7 @@ def test_tool_failure_is_fed_back_as_text(tmp_path) -> None:
         result = run_agent("try it", client, registry, session, "fake")
     assert result == "recovered"
     tool_message = client.calls[1][-1]
-    assert tool_message.role == "tool"
+    assert tool_message.role == Role.TOOL
     assert "FileNotFoundError" in (tool_message.content or "")
 
 
@@ -114,6 +116,15 @@ def test_response_carries_text_alongside_tool_calls() -> None:
     assert [call.name for call in response.tool_calls] == ["ping"]
 
 
+def test_message_role_is_validated_against_the_vocabulary() -> None:
+    # `Role` names the closed set of roles. A plain string is accepted and
+    # normalized to the member; anything outside the set fails at
+    # construction rather than reaching a backend as a malformed turn.
+    assert Message(role="user", content="hi").role is Role.USER
+    with pytest.raises(ValueError, match="not a valid Role"):
+        Message(role="sytem", content="oops")
+
+
 def test_interstitial_text_is_kept_on_the_assistant_turn(tmp_path) -> None:
     # Issue 16: the text said alongside a tool call reaches the assistant
     # message, the next model_call, and the transcript.
@@ -131,7 +142,7 @@ def test_interstitial_text_is_kept_on_the_assistant_turn(tmp_path) -> None:
     with Session(path) as session:
         run_agent("ping", client, registry, session, "fake")
     assistant_turn = client.calls[1][-2]
-    assert assistant_turn.role == "assistant"
+    assert assistant_turn.role == Role.ASSISTANT
     assert assistant_turn.content == "Let me ping first."
     assert [call.name for call in assistant_turn.tool_calls] == ["ping"]
     events = [
@@ -221,7 +232,7 @@ def test_conversation_reset_drops_history_and_starts_fresh(tmp_path) -> None:
         assert len(conversation.messages) == 3
         conversation.reset()
         assert len(conversation.messages) == 1
-        assert conversation.messages[0].role == "system"
+        assert conversation.messages[0].role == Role.SYSTEM
         conversation.send("after reset")
     # The second model_call (post-reset) must NOT see the first turn.
     second_call = client.calls[1]
@@ -254,7 +265,7 @@ def test_conversation_appends_assistant_on_empty_output(tmp_path) -> None:
         conversation = Conversation(client, Registry(), session, "fake")
         first = conversation.send("ask one")
         assert first == "Stopped: model returned empty output."
-        assert conversation.messages[-1].role == "assistant"
+        assert conversation.messages[-1].role == Role.ASSISTANT
         assert conversation.messages[-1].content == first
         conversation.send("ask two")
     second_call = client.calls[1]
@@ -275,13 +286,13 @@ def test_conversation_appends_assistant_on_iteration_cap(tmp_path) -> None:
         conversation = Conversation(client, registry, session, "fake")
         first = conversation.send("loop forever")
         assert "limit" in first
-        assert conversation.messages[-1].role == "assistant"
+        assert conversation.messages[-1].role == Role.ASSISTANT
         assert conversation.messages[-1].content == first
         conversation.send("after cap")
     # The call after the cap-out must see a coherent end-of-history.
     follow_up_call = client.calls[MAX_ITERATIONS]
-    assert follow_up_call[-1].role == "user"
-    assert follow_up_call[-2].role == "assistant"
+    assert follow_up_call[-1].role == Role.USER
+    assert follow_up_call[-2].role == Role.ASSISTANT
 
 
 class RecordingReporter:
@@ -414,7 +425,7 @@ def test_truncated_output_stops_with_partial_text_and_notice(tmp_path) -> None:
         result = conversation.send("explain")
         assert result.startswith("Here is the fi")
         assert "cut off at the token limit" in result
-        assert conversation.messages[-1].role == "assistant"
+        assert conversation.messages[-1].role == Role.ASSISTANT
         assert conversation.messages[-1].content == result
         conversation.send("go on")
     assert [m.role for m in client.calls[1]] == ["system", "user", "assistant", "user"]
@@ -465,10 +476,10 @@ def test_provider_state_is_copied_onto_assistant_turns(tmp_path) -> None:
         conversation = Conversation(client, registry, session, "fake")
         conversation.send("ping")
     tool_turn = client.calls[1][-2]
-    assert tool_turn.role == "assistant"
+    assert tool_turn.role == Role.ASSISTANT
     assert tool_turn.provider_state == {"opaque": 1}
     final_turn = conversation.messages[-1]
-    assert final_turn.role == "assistant"
+    assert final_turn.role == Role.ASSISTANT
     assert final_turn.content == "done"
     assert final_turn.provider_state == {"opaque": 2}
     events = [
@@ -500,5 +511,5 @@ def test_sentinel_turns_carry_no_provider_state(tmp_path) -> None:
         conversation = Conversation(client, registry, session, "fake")
         for task in ("empty", "truncated", "capped"):
             conversation.send(task)
-            assert conversation.messages[-1].role == "assistant"
+            assert conversation.messages[-1].role == Role.ASSISTANT
             assert conversation.messages[-1].provider_state is None

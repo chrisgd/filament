@@ -17,6 +17,17 @@ DEFAULT_ROSIE_MODEL = "Qwen3-Coder-30B-A3B-Instruct"
 
 @dataclass
 class Config:
+    """Runtime settings, one per environment variable (see `load_config`).
+
+    Attributes:
+        backend: Which model client to build: `rosie` or `anthropic`.
+        rosie_endpoint: Base URL of Rosie's OpenAI-compatible API.
+        rosie_model: Model name to request from Rosie.
+        anthropic_api_key: Anthropic API key; required for that backend.
+        anthropic_model: Anthropic model name.
+        workdir: Directory the file and shell tools are confined to.
+    """
+
     backend: str
     rosie_endpoint: str
     rosie_model: str

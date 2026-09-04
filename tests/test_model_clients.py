@@ -28,7 +28,7 @@ from filament.model_clients.rosie import (
     _to_wire_message,
 )
 from filament.tools.base import Tool
-from filament.types import Message, ToolCall
+from filament.types import Message, Role, ToolCall
 
 
 @pytest.mark.integration
@@ -36,7 +36,7 @@ def test_rosie_trivial_completion() -> None:
     config = load_config()
     client = RosieClient(config.rosie_endpoint, config.rosie_model)
     response = client.complete(
-        [Message(role="user", content="Reply with the single word: filament")],
+        [Message(role=Role.USER, content="Reply with the single word: filament")],
         [],
     )
     assert response.text is not None
@@ -49,7 +49,7 @@ def test_anthropic_trivial_completion() -> None:
     config = load_config()
     client = AnthropicClient(config.anthropic_api_key, config.anthropic_model)
     response = client.complete(
-        [Message(role="user", content="Reply with the single word: filament")],
+        [Message(role=Role.USER, content="Reply with the single word: filament")],
         [],
     )
     assert response.text is not None
@@ -58,14 +58,14 @@ def test_anthropic_trivial_completion() -> None:
 
 
 def test_rosie_system_message_passes_through() -> None:
-    wire = _to_wire_message(Message(role="system", content="be helpful"))
+    wire = _to_wire_message(Message(role=Role.SYSTEM, content="be helpful"))
     assert wire == {"role": "system", "content": "be helpful"}
 
 
 def test_anthropic_lifts_system_into_top_level_param() -> None:
     messages = [
-        Message(role="system", content="be helpful"),
-        Message(role="user", content="Task: greet"),
+        Message(role=Role.SYSTEM, content="be helpful"),
+        Message(role=Role.USER, content="Task: greet"),
     ]
     assert _system_prompt(messages) == "be helpful"
     wire = _to_wire_messages(messages)
@@ -74,7 +74,7 @@ def test_anthropic_lifts_system_into_top_level_param() -> None:
 
 
 def test_anthropic_system_prompt_empty_without_system_message() -> None:
-    messages = [Message(role="user", content="Task: greet")]
+    messages = [Message(role=Role.USER, content="Task: greet")]
     assert _system_prompt(messages) == ""
 
 
@@ -147,7 +147,7 @@ def test_anthropic_renders_assistant_text_before_tool_use_on_replay() -> None:
     wire = _to_wire_messages(
         [
             Message(
-                role="assistant",
+                role=Role.ASSISTANT,
                 content="Let me read it.",
                 tool_calls=[
                     ToolCall(id="t1", name="read_file", arguments={"path": "README.md"})
@@ -230,18 +230,18 @@ def test_anthropic_coalesces_consecutive_tool_results_into_one_user_message() ->
     # The Messages API wants every tool_result for one assistant turn in a
     # single user message; splitting them degrades parallel tool use.
     messages = [
-        Message(role="user", content="Task: go"),
+        Message(role=Role.USER, content="Task: go"),
         Message(
-            role="assistant",
+            role=Role.ASSISTANT,
             content=None,
             tool_calls=[
                 ToolCall(id="t1", name="a", arguments={}),
                 ToolCall(id="t2", name="b", arguments={}),
             ],
         ),
-        Message(role="tool", content="r1", tool_call_id="t1", name="a"),
-        Message(role="tool", content="r2", tool_call_id="t2", name="b"),
-        Message(role="user", content="Task: next"),
+        Message(role=Role.TOOL, content="r1", tool_call_id="t1", name="a"),
+        Message(role=Role.TOOL, content="r2", tool_call_id="t2", name="b"),
+        Message(role=Role.USER, content="Task: next"),
     ]
     wire = _to_wire_messages(messages)
     assert [m["role"] for m in wire] == ["user", "assistant", "user", "user"]
@@ -291,7 +291,7 @@ def test_anthropic_replays_thinking_blocks_first_on_tool_use_turns() -> None:
     wire = _to_wire_messages(
         [
             Message(
-                role="assistant",
+                role=Role.ASSISTANT,
                 content="Let me read it.",
                 tool_calls=[
                     ToolCall(id="t1", name="read_file", arguments={"path": "README.md"})
@@ -324,7 +324,7 @@ def test_anthropic_replays_thinking_blocks_on_final_text_turns() -> None:
     wire = _to_wire_messages(
         [
             Message(
-                role="assistant",
+                role=Role.ASSISTANT,
                 content="done",
                 provider_state={"thinking_blocks": [thinking]},
             )
@@ -340,7 +340,7 @@ def test_anthropic_replays_thinking_blocks_on_final_text_turns() -> None:
 
 def test_anthropic_plain_assistant_text_stays_a_bare_string() -> None:
     # Nothing to replay: the shape this client has always sent is unchanged.
-    wire = _to_wire_messages([Message(role="assistant", content="done")])
+    wire = _to_wire_messages([Message(role=Role.ASSISTANT, content="done")])
     assert wire == [{"role": "assistant", "content": "done"}]
 
 
@@ -361,7 +361,7 @@ def test_anthropic_replays_thinking_blocks_across_a_tool_round() -> None:
     )
     messages = [
         Message(
-            role="user",
+            role=Role.USER,
             content="Call the ping tool once, then report what it returned.",
         )
     ]
@@ -369,7 +369,7 @@ def test_anthropic_replays_thinking_blocks_across_a_tool_round() -> None:
     assert [call.name for call in first.tool_calls] == ["ping"]
     messages.append(
         Message(
-            role="assistant",
+            role=Role.ASSISTANT,
             content=first.text,
             tool_calls=first.tool_calls,
             provider_state=first.provider_state,
@@ -377,7 +377,7 @@ def test_anthropic_replays_thinking_blocks_across_a_tool_round() -> None:
     )
     for call in first.tool_calls:
         messages.append(
-            Message(role="tool", content="pong", tool_call_id=call.id, name=call.name)
+            Message(role=Role.TOOL, content="pong", tool_call_id=call.id, name=call.name)
         )
     # A 400 here would mean the replay dropped or altered the blocks.
     second = client.complete(messages, [ping])

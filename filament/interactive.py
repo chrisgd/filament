@@ -17,7 +17,7 @@ from .model_clients.base import ModelClient, ModelResponseError
 from .session import Session
 from .tools import ask_user as ask_user_module
 from .tools.base import Registry
-from .types import Message, Response
+from .types import Message, Response, Role
 
 _ARG_VALUE_MAX = 60
 _ARG_TRUNCATION_SUFFIX = "..."
@@ -190,16 +190,13 @@ def run_interactive(
 
 def _message_summary(messages: list[Message]) -> str:
     """Format the /messages output: count by role."""
-    counts = {"system": 0, "user": 0, "assistant": 0, "tool_result": 0}
+    counts = {role: 0 for role in Role}
     for message in messages:
-        if message.role == "tool":
-            counts["tool_result"] += 1
-        elif message.role in counts:
-            counts[message.role] += 1
+        counts[message.role] += 1
     return (
         f"{len(messages)} messages ("
-        f"{counts['system']} system, "
-        f"{counts['user']} user, "
-        f"{counts['assistant']} assistant, "
-        f"{counts['tool_result']} tool_result)"
+        f"{counts[Role.SYSTEM]} system, "
+        f"{counts[Role.USER]} user, "
+        f"{counts[Role.ASSISTANT]} assistant, "
+        f"{counts[Role.TOOL]} tool_result)"
     )
