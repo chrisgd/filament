@@ -442,3 +442,63 @@ def test_truncated_turn_is_never_dispatched(tmp_path) -> None:
         result = run_agent("ping", client, registry, session, "fake")
     assert dispatched == []
     assert result == "Stopped: model output was cut off at the token limit."
+
+
+def test_provider_state_is_copied_onto_assistant_turns(tmp_path) -> None:
+    # Backend-private state (today: Anthropic thinking blocks) rides from the
+    # Response onto the assistant message the loop builds, on both the
+    # tool-call path and the final-answer path, so the client can replay it
+    # on the next request. The loop never reads it. The next model_call and
+    # the transcript both carry it. See SPEC-provider-state.md.
+    path = tmp_path / "s.jsonl"
+    client = FakeClient(
+        [
+            Response(
+                tool_calls=[ToolCall(id="c1", name="ping", arguments={})],
+                provider_state={"opaque": 1},
+            ),
+            Response(text="done", provider_state={"opaque": 2}),
+        ]
+    )
+    registry = registry_with("ping", lambda args: "pong")
+    with Session(path) as session:
+        conversation = Conversation(client, registry, session, "fake")
+        conversation.send("ping")
+    tool_turn = client.calls[1][-2]
+    assert tool_turn.role == "assistant"
+    assert tool_turn.provider_state == {"opaque": 1}
+    final_turn = conversation.messages[-1]
+    assert final_turn.role == "assistant"
+    assert final_turn.content == "done"
+    assert final_turn.provider_state == {"opaque": 2}
+    events = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert events[1]["response"]["provider_state"] == {"opaque": 1}
+    assert events[4]["event"] == "model_call"
+    assert events[4]["messages"][-2]["provider_state"] == {"opaque": 1}
+
+
+def test_sentinel_turns_carry_no_provider_state(tmp_path) -> None:
+    # Empty output, truncation, and the iteration cap append synthetic
+    # assistant turns. Those words are the harness's, not the model's, so
+    # they carry no provider state even when the Response had some.
+    scripted = [
+        Response(provider_state={"opaque": 1}),
+        Response(text="cut", truncated=True, provider_state={"opaque": 2}),
+    ] + [
+        Response(
+            tool_calls=[ToolCall(id=f"c{i}", name="ping", arguments={})],
+            provider_state={"opaque": 3},
+        )
+        for i in range(MAX_ITERATIONS)
+    ]
+    client = FakeClient(scripted)
+    registry = registry_with("ping", lambda args: "pong")
+    with Session(tmp_path / "s.jsonl") as session:
+        conversation = Conversation(client, registry, session, "fake")
+        for task in ("empty", "truncated", "capped"):
+            conversation.send(task)
+            assert conversation.messages[-1].role == "assistant"
+            assert conversation.messages[-1].provider_state is None

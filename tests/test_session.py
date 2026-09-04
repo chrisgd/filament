@@ -67,3 +67,25 @@ def test_new_session_creates_timestamped_file(tmp_path) -> None:
     assert session.path.parent == tmp_path
     assert session.path.suffix == ".jsonl"
     assert session.path.exists()
+
+
+def test_provider_state_is_recorded_in_transcript_events(tmp_path) -> None:
+    # Backend-private state is a field of Response and of the assistant
+    # Message built from it, so it lands in both event types with no session
+    # code of its own. It is repeated in every later model_call, which is
+    # where that part of the transcript's growth comes from.
+    path = tmp_path / "s.jsonl"
+    state = {
+        "thinking_blocks": [
+            {"type": "thinking", "thinking": "", "signature": "sig"}
+        ]
+    }
+    with Session(path) as session:
+        session.log_model_response(Response(text="done", provider_state=state))
+        session.log_model_call(
+            "anthropic",
+            [Message(role="assistant", content="done", provider_state=state)],
+        )
+    events = _read_events(path)
+    assert events[0]["response"]["provider_state"] == state
+    assert events[1]["messages"][0]["provider_state"] == state

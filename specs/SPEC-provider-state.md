@@ -2,11 +2,12 @@
 
 A design spec for carrying backend-private state (today: Anthropic thinking blocks) across turns without letting it leak into the agent loop. This is a component spec; load-bearing constraints in `CLAUDE.md` apply.
 
-**Status: proposed, not implemented.** Written 2026-09-02 to record a design discussion and the decision that came out of it. Implement it when the Anthropic default is to move to a Claude 5 model.
+**Status: implemented 2026-09-03.** Written 2026-09-02 to record a design discussion and the decision that came out of it. The default-model flip it unblocks is tracked as issue 19.
 
 ## Decision record
 
 - 2026-09-02: keep `claude-sonnet-4-6` as the Anthropic default. Every Claude 5 model runs thinking by default and requires its thinking blocks to be replayed, and the client has nowhere to keep them. Switching the default string alone would fail on the second turn of any tool-use conversation. Implement this spec first; then the default flips to `claude-sonnet-5` in one line and the lower price comes with it.
+- 2026-09-03: replay implemented as written below. The default stays on `claude-sonnet-4-6` until the follow-up flips it.
 
 ## Purpose
 

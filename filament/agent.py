@@ -132,8 +132,18 @@ class Conversation:
                 # Final answer. Record it in conversation history so the
                 # next .send() sees it. For one-shot use this is invisible —
                 # the messages list is discarded on return.
+                #
+                # Whatever backend-private state the client handed over goes
+                # back on the assistant turn, so the client can replay it on
+                # the next request. The loop never reads it. The sentinel
+                # turns (truncated, empty, capped) carry none: their words
+                # are the harness's, not the model's.
                 self.messages.append(
-                    Message(role="assistant", content=response.text)
+                    Message(
+                        role="assistant",
+                        content=response.text,
+                        provider_state=response.provider_state,
+                    )
                 )
                 return response.text
 
@@ -149,13 +159,15 @@ class Conversation:
 
             # Tool calls. Record the assistant turn with any text the model
             # said alongside its calls ("let me read the README first") so
-            # the transcript and the replayed conversation keep it, then
-            # dispatch each call and append its result.
+            # the transcript and the replayed conversation keep it, and with
+            # the provider state for the same reason as above, then dispatch
+            # each call and append its result.
             self.messages.append(
                 Message(
                     role="assistant",
                     content=response.text,
                     tool_calls=response.tool_calls,
+                    provider_state=response.provider_state,
                 )
             )
             for call in response.tool_calls:
