@@ -613,7 +613,7 @@ stays one line and the truncation width is measured on what is printed.
 
 ## Issue 19 — Anthropic default is Sonnet 4.6; Claude 5 models need thinking-block replay first
 
-**Status:** Deferred (decision 2026-09-02); see @specs/SPEC-provider-state.md
+**Status:** Done (commit f6099c9); see @specs/SPEC-provider-state.md
 **Severity:** Design decision
 **Location:** `filament/config.py:14`, `filament/model_clients/anthropic.py`
 
@@ -625,9 +625,11 @@ keep them, so switching the default string alone would fail on the second
 turn of any tool-use conversation.
 
 ### Resolution
-Keep `claude-sonnet-4-6`. Implement the provider-state replay spec first;
-then the default flips to `claude-sonnet-5` in one line. The discussion,
-the design, and the alternatives considered are recorded in the spec.
+Kept `claude-sonnet-4-6` until the provider-state replay spec was
+implemented (PR #23), then flipped the default to `claude-sonnet-5` in one
+line once the integration test replaying a tool round against that model
+passed with a live key (2026-09-03). The discussion, the design, and the
+alternatives considered are recorded in the spec.
 
 ---
 
