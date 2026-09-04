@@ -11,7 +11,7 @@ import os
 from dataclasses import dataclass
 
 DEFAULT_BACKEND = "rosie"
-DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6"
+DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-5"
 DEFAULT_ROSIE_MODEL = "Qwen3-Coder-30B-A3B-Instruct"
 
 
