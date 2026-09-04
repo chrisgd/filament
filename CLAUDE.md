@@ -29,7 +29,8 @@ The agent loop, tool registry, and session module operate on Filament's internal
 
 Defined in `filament/types.py`:
 
-- **`Message`** — One turn in conversation history. Has `role`, `content`, `tool_calls`, `tool_call_id`, `name`, and `provider_state`.
+- **`Role`** — The closed set of message roles: `SYSTEM`, `USER`, `ASSISTANT`, `TOOL`. A `StrEnum`, so a member is its plain string on the wire and in the transcript. `Message` validates its `role` against it at construction.
+- **`Message`** — One turn in conversation history. Has `role` (a `Role`), `content`, `tool_calls`, `tool_call_id`, `name`, and `provider_state`.
 - **`ToolCall`** — A request from the model to invoke a tool. Has `id`, `name`, `arguments` (already-parsed dict).
 - **`Response`** — A model client's return value. Has `text` (what the model said) and `tool_calls` (what it asked for); both may be present. A turn with tool calls is not final, whatever its text; a turn with neither is empty output. `truncated` marks output the backend cut off at its token limit; the loop stops rather than act on it. `provider_state` is opaque backend state (today, Anthropic thinking blocks) that the loop copies onto the assistant message and never reads; only the client that produced it may interpret it. See @specs/SPEC-provider-state.md.
 

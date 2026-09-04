@@ -8,6 +8,30 @@ never appear outside of them.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
+
+
+class Role(StrEnum):
+    """Who produced a `Message`. Filament's vocabulary, not either backend's.
+
+    A `StrEnum`: a member compares equal to, hashes like, and serializes as
+    its string, so `Role.USER` is `"user"` on the wire and in the transcript
+    with no `.value` needed. Both wire formats use these same strings for
+    the roles they have; where a backend lacks one, its client translates
+    (the Anthropic client lifts SYSTEM into a request parameter and sends
+    TOOL as a `tool_result` block inside a user turn).
+
+    Members:
+        SYSTEM: The harness's standing instructions; always the first message.
+        USER: The task, from the human.
+        ASSISTANT: The model's turn: its text, its tool calls, or both.
+        TOOL: A tool's result, fed back to the model as observation.
+    """
+
+    SYSTEM = "system"
+    USER = "user"
+    ASSISTANT = "assistant"
+    TOOL = "tool"
 
 
 @dataclass
@@ -34,12 +58,18 @@ class Message:
     that produced it can send it back on the next request. See `Response`.
     """
 
-    role: str
+    role: Role
     content: str | None = None
     tool_calls: list[ToolCall] | None = None
     tool_call_id: str | None = None
     name: str | None = None
     provider_state: object | None = None
+
+    def __post_init__(self) -> None:
+        # Accept the plain string too, so `Message(role="user")` works, and
+        # reject anything outside the vocabulary here rather than let a
+        # malformed turn reach a backend.
+        self.role = Role(self.role)
 
 
 @dataclass

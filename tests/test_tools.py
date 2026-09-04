@@ -218,7 +218,7 @@ def test_ask_user_eof_through_loop_surfaces_as_tool_error(
     """
     from filament.agent import run_agent
     from filament.session import Session
-    from filament.types import Response, ToolCall
+    from filament.types import Response, Role, ToolCall
     from tests.fakes import FakeClient
 
     ask_user_module.configure_streams(io.StringIO(""), io.StringIO())
@@ -238,7 +238,7 @@ def test_ask_user_eof_through_loop_surfaces_as_tool_error(
     assert result == "couldn't get an answer"
     second_call_messages = client.calls[1]
     tool_message = second_call_messages[-1]
-    assert tool_message.role == "tool"
+    assert tool_message.role == Role.TOOL
     assert tool_message.content.startswith("error: EOFError: ")
 
 

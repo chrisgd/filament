@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from filament.session import Session, new_session
-from filament.types import Message, Response, ToolCall
+from filament.types import Message, Response, Role, ToolCall
 
 
 def _read_events(path) -> list[dict]:
@@ -16,7 +16,7 @@ def _read_events(path) -> list[dict]:
 def test_session_writes_one_json_object_per_event(tmp_path) -> None:
     path = tmp_path / "s.jsonl"
     with Session(path) as session:
-        session.log_model_call("rosie", [Message(role="user", content="hi")])
+        session.log_model_call("rosie", [Message(role=Role.USER, content="hi")])
         session.log_model_response(Response(text="done"))
     events = _read_events(path)
     assert [e["event"] for e in events] == ["model_call", "model_response"]
@@ -27,7 +27,7 @@ def test_model_call_event_records_backend_and_messages(tmp_path) -> None:
     path = tmp_path / "s.jsonl"
     with Session(path) as session:
         session.log_model_call(
-            "anthropic", [Message(role="user", content="task")]
+            "anthropic", [Message(role=Role.USER, content="task")]
         )
     event = _read_events(path)[0]
     assert event["backend"] == "anthropic"
@@ -52,9 +52,9 @@ def test_tool_call_and_result_events(tmp_path) -> None:
 def test_log_reset_writes_conversation_reset_event(tmp_path) -> None:
     path = tmp_path / "s.jsonl"
     with Session(path) as session:
-        session.log_model_call("fake", [Message(role="user", content="hi")])
+        session.log_model_call("fake", [Message(role=Role.USER, content="hi")])
         session.log_reset()
-        session.log_model_call("fake", [Message(role="user", content="hi")])
+        session.log_model_call("fake", [Message(role=Role.USER, content="hi")])
     events = _read_events(path)
     kinds = [e["event"] for e in events]
     assert kinds == ["model_call", "conversation_reset", "model_call"]
@@ -84,7 +84,7 @@ def test_provider_state_is_recorded_in_transcript_events(tmp_path) -> None:
         session.log_model_response(Response(text="done", provider_state=state))
         session.log_model_call(
             "anthropic",
-            [Message(role="assistant", content="done", provider_state=state)],
+            [Message(role=Role.ASSISTANT, content="done", provider_state=state)],
         )
     events = _read_events(path)
     assert events[0]["response"]["provider_state"] == state

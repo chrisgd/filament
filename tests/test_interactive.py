@@ -14,7 +14,7 @@ from filament.interactive import ConsoleReporter, run_interactive
 from filament.model_clients.base import ModelResponseError
 from filament.session import Session
 from filament.tools.base import Registry
-from filament.types import Response, ToolCall
+from filament.types import Response, Role, ToolCall
 from tests.fakes import FailThenSucceed, FakeClient, registry_with, status_error
 
 
@@ -115,7 +115,7 @@ def test_unknown_slash_command_is_treated_as_task(tmp_path) -> None:
     )
     assert len(client.calls) == 1
     user_message = client.calls[0][1]
-    assert user_message.role == "user"
+    assert user_message.role == Role.USER
     assert "/etc/hosts" in (user_message.content or "")
 
 
