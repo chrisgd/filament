@@ -635,7 +635,7 @@ alternatives considered are recorded in the spec.
 
 ## Issue 20 — Rosie's default model is gone; Qwen3.8 replaces it
 
-**Status:** Open — server side resolved; config and spec changes pending
+**Status:** Done (commit 8f08923)
 **Severity:** Configuration (blocks the Rosie backend with default config)
 **Location:** `filament/config.py:15` (`DEFAULT_ROSIE_MODEL`),
 `specs/SPEC-provider-state.md` (Rosie paragraph)

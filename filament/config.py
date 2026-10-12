@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 DEFAULT_BACKEND = "rosie"
 DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-5"
-DEFAULT_ROSIE_MODEL = "Qwen3-Coder-30B-A3B-Instruct"
+DEFAULT_ROSIE_MODEL = "Qwen3.8-27B-FP8"
 
 
 @dataclass
