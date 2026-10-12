@@ -55,9 +55,10 @@ def _to_wire_message(message: Message) -> dict[str, object]:
     Anthropic client must instead lift them to a top-level `system` param.)
 
     `provider_state` is not read: Rosie has nothing to replay. Thinking Qwen
-    variants under vLLM return their reasoning in a separate
-    `reasoning_content` field that is not part of the history sent back, and
-    `_from_wire_response` never sets the field. See
+    variants under vLLM, when the server runs a reasoning parser, return
+    their reasoning in a separate `reasoning_content` field that is not part
+    of the history sent back, and `_from_wire_response` never sets the field.
+    See
     @specs/SPEC-provider-state.md.
     """
     if message.role == Role.TOOL:

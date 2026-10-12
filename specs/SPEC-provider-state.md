@@ -9,6 +9,7 @@ A design spec for carrying backend-private state (today: Anthropic thinking bloc
 - 2026-09-02: keep `claude-sonnet-4-6` as the Anthropic default. Every Claude 5 model runs thinking by default and requires its thinking blocks to be replayed, and the client has nowhere to keep them. Switching the default string alone would fail on the second turn of any tool-use conversation. Implement this spec first; then the default flips to `claude-sonnet-5` in one line and the lower price comes with it.
 - 2026-09-03: replay implemented as written below. The default stays on `claude-sonnet-4-6` until the follow-up flips it.
 - 2026-09-03: the integration test replaying a tool round against `claude-sonnet-5` passed with a live key; the default flipped to `claude-sonnet-5` (issue 19).
+- 2026-10-12: Rosie's default became `Qwen3.8-27B-FP8`, a thinking model (issue 20). The Rosie client still replays nothing: the server's reasoning parser keeps the thinking out of `content`, and the model does not require it back.
 
 ## Purpose
 
@@ -26,7 +27,7 @@ Current Anthropic models break that assumption. When thinking is on, a reply car
 
 So Sonnet 4.6 is the last Sonnet where sending nothing means no thinking, and the top tier cannot be told not to think. A harness that wants to run any Claude 5 model with its default behavior has to carry the blocks. This is not going away, and it is not Anthropic-specific in kind: OpenAI's newer API hands back reasoning items with the same replay requirement.
 
-Rosie is a separate story. The default model there, Qwen3-Coder-30B-A3B-Instruct, does not think. Thinking Qwen variants served by vLLM return reasoning in a separate `reasoning_content` field when a reasoning parser is configured, and the history sent back does not include it. Nothing to replay on that side.
+Rosie is a separate story. The default model there, Qwen3.8-27B-FP8, thinks by default, but nothing about it needs replaying. Rosie's vLLM server runs a reasoning parser, which returns the thinking in a separate `reasoning_content` field and leaves `content` clean; the history Filament sends back does not include it, and the model does not require it. (Qwen3.8 can optionally take earlier reasoning back, via `preserve_thinking`; that is an opt-in quality knob, not a signed-replay requirement like Anthropic's.) Without a reasoning parser on the server, the thinking would land inline in `content` instead, which is a server configuration problem, not a client one.
 
 The teaching point is real: modern backends give the harness state it must echo without understanding, and that is why real harnesses are careful about editing history. A student who sees the field learns that.
 
