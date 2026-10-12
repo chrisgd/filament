@@ -633,6 +633,50 @@ alternatives considered are recorded in the spec.
 
 ---
 
+## Issue 20 — Rosie's default model is gone; Qwen3.8 replaces it
+
+**Status:** Open — server side resolved; config and spec changes pending
+**Severity:** Configuration (blocks the Rosie backend with default config)
+**Location:** `filament/config.py:15` (`DEFAULT_ROSIE_MODEL`),
+`specs/SPEC-provider-state.md` (Rosie paragraph)
+
+### Problem
+On 2026-10-09 the Rosie integration test could not pass with the default
+configuration: nothing on Rosie served `Qwen3-Coder-30B-A3B-Instruct`.
+
+The cause was not an outage. Rosie's Qwen server is a Slurm job, not a
+standing service, and the last one hit its time limit and was not restarted.
+
+### Server-side resolution (2026-10-09)
+Serving is managed from a separate, private operations repo (`rosie-vllm`),
+which holds the cluster-specific details: hosts, login, tunnel, and the Slurm
+scripts. Rosie now serves `Qwen/Qwen3.8-27B-FP8` on one H100 under vLLM 0.30,
+with the `qwen3_coder` tool parser and the `qwen3` reasoning parser. Verified:
+the Rosie integration test passes, and a one-shot `filament` task completed a
+`read_file` tool round correctly.
+
+The serving job has a time limit. If Rosie stops answering, check whether the
+job expired before suspecting the cluster.
+
+### Fix
+- Change `DEFAULT_ROSIE_MODEL` to `Qwen3.8-27B-FP8` (the served name).
+- Update the Rosie paragraph in `specs/SPEC-provider-state.md`. It says the
+  Rosie model does not think; Qwen3.8 does. With the reasoning parser on, the
+  thinking comes back in a separate `reasoning_content` field and the visible
+  `content` is clean, so the client still has nothing to replay and the
+  conclusion holds. The text should name the current model and say why.
+
+No per-backend prompt changes: a different model's behaviour on the same
+prompt is data.
+
+### Acceptance criteria
+- `pytest -m integration -k rosie` passes with only `FILAMENT_ROSIE_ENDPOINT`
+  set.
+- The default model name and the provider-state spec name the model Rosie
+  actually serves.
+
+---
+
 ## Resolved / Not an issue
 
 ### Explanatory comments in `cli.py` `main()` — INTENTIONAL, no action
