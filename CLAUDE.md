@@ -122,7 +122,8 @@ specs/
 ├── SPEC-ask-user-tool.md           # `ask_user` elicitation tool design spec
 ├── SPEC-activity-signals.md        # Activity-signal design spec
 ├── SPEC-workdir-boundary.md        # Working-directory boundary design spec
-└── SPEC-provider-state.md          # Provider-state replay (thinking blocks) design spec
+├── SPEC-provider-state.md          # Provider-state replay (thinking blocks) design spec
+└── SPEC-classroom.md               # Classroom layer design spec (proposed)
 ```
 
 ## Development Conventions
@@ -162,4 +163,5 @@ The CLI accepts `--backend rosie|anthropic` as an override. Faculty running Fila
 - @specs/SPEC-activity-signals.md — Activity-signal design spec; read this before adding progress output to interactive mode
 - @specs/SPEC-workdir-boundary.md — Working-directory boundary design spec; read this before touching the file or shell tools
 - @specs/SPEC-provider-state.md — Provider-state replay design spec; read this before changing the Anthropic default model, touching the Anthropic client's replay path, or adding thinking support
+- @specs/SPEC-classroom.md — Classroom layer design spec (proposed); read this before adding anything meant for students using Filament as a working tool, or before changing the transcript format
 - `tests/` — The behavioral contract; if in doubt, read the tests
